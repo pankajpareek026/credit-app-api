@@ -136,7 +136,7 @@ app.get('/search', authy, async (req, res) => {
     const query = req.headers.query
 
     let result = await clients.aggregate([
-        { "$match": { name: { "$regex": query, $options: "i" } } },
+        { "$match": {parentId:parentId, name: { "$regex": query, $options: "i" } } },
         {
             "$project": {
                 "name": 1, "parentId": 1,
@@ -146,7 +146,7 @@ app.get('/search', authy, async (req, res) => {
             }
         }
     ])
-
+    console.log(result)
     if (result.length > 0) {
         res.json({ response: result })
     }
