@@ -136,7 +136,7 @@ app.get('/search', authy, async (req, res) => {
     const query = req.headers.query
 
     let result = await clients.aggregate([
-        { "$match": {parentId:parentId, name: { "$regex": query, $options: "i" } } },
+        { "$match": { name: { "$regex": query, $options: "i" } } },
         {
             "$project": {
                 "name": 1, "parentId": 1,
@@ -146,7 +146,7 @@ app.get('/search', authy, async (req, res) => {
             }
         }
     ])
-    console.log(result)
+
     if (result.length > 0) {
         res.json({ response: result })
     }
@@ -189,9 +189,9 @@ app.get('/clients', authy, async (req, res) => {
             }
         ])
 
-        if (result) { res.json({ response: result }) }
+        if (result) { res.json({ type: 'successs', response: result }) }
         else {
-            res.json({ response: "Not Found !" })
+            res.json({ type: 'successs', response: "Not Found !" })
         }
     }
     else {
