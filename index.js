@@ -86,10 +86,10 @@ app.post('/login', async (req, res) => {
                 delete result.email;
 
                 const token = jwt.sign(result, privetKey, {
-                    expiresIn: "2d"
+                    expiresIn: "28d"
                 })
                 const options = {
-                    expiresIn: '2d',
+                    expiresIn: '28d',
                     httpOnly: true
                 }
                 res.cookie("tkn", token, options).json({ response: "success", user: token })
