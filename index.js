@@ -59,7 +59,7 @@ app.post('/register', async (req, res) => {
             delete query.email
             const token = jwt.sign(query, privetKey)
             const options = {
-                expiresIn: new Date(Date.now() * 3 * 24 * 60 * 60 * 60 * 1000),
+                expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),
                 httpOnly: true
             }
             res.status(200).cookie("tkn", token, options).json({ response: "success" })
@@ -89,7 +89,7 @@ app.post('/login', async (req, res) => {
                     expiresIn: "28d"
                 })
                 const options = {
-                    expiresIn: '28d',
+                      expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),,
                     httpOnly: true
                 }
                 res.cookie("tkn", token, options).json({ response: "success", user: token })
@@ -184,6 +184,7 @@ app.get('/clients', authy, async (req, res) => {
                     "totalAmount": {
                         "$sum": "$transactions.amount"
                     },
+                     "lastDate": { $slice: ["$transactions.date", -1] }
 
                 }
             }
