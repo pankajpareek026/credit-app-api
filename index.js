@@ -89,7 +89,7 @@ app.post('/login', async (req, res) => {
                     expiresIn: "28d"
                 })
                 const options = {
-                      expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),,
+                      expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),
                     httpOnly: true
                 }
                 res.cookie("tkn", token, options).json({ response: "success", user: token })
