@@ -5,12 +5,17 @@ const bcrypt = require('bcryptjs')
 const express = require('express')
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser')
+const mongoose = require('mongoose')
 require('./db/config.js')
 const app = express()
 const user = require('./Models/user.js');
 const clients = require('./Models/clients')
+const share = require('./Models/share.js')
+const jwtGenetator = require('./utils/jwtGenerator.js')
+const jwtVerify = require('./utils/jwtVerify.js')
+
 //meddilswares
-//meddilswares
+
 const privetKey = "WeShoulHaveAStrongPriVaTeKek@24-12-2022"
 let i = 0
 app.use(express.json())
@@ -59,7 +64,7 @@ app.post('/register', async (req, res) => {
             delete query.email
             const token = jwt.sign(query, privetKey)
             const options = {
-                expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),
+                expiresIn: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                 httpOnly: true
             }
             res.status(200).cookie("tkn", token, options).json({ response: "success" })
@@ -89,7 +94,7 @@ app.post('/login', async (req, res) => {
                     expiresIn: "28d"
                 })
                 const options = {
-                      expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),
+                    expiresIn: new Date(Date.now() * 15 * 24 * 60 * 60 * 60 * 1000),
                     httpOnly: true
                 }
                 res.cookie("tkn", token, options).json({ response: "success", user: token })
@@ -184,7 +189,7 @@ app.get('/clients', authy, async (req, res) => {
                     "totalAmount": {
                         "$sum": "$transactions.amount"
                     },
-                     "lastDate": { $slice: ["$transactions.date", -1] }
+                    "lastDate": { $slice: ["$transactions.date", -1] }
 
                 }
             }
@@ -203,7 +208,6 @@ app.get('/clients', authy, async (req, res) => {
 app.post('/client/newTransaction', authy, async (req, res) => {
     const parentId = req.body.user._id
     const _id = req.headers.uid
-
 
     const { amount, date, dis, type } = req.body;
     if (!parentId || !_id || !amount || !date || !dis || !type) {
@@ -231,6 +235,8 @@ app.post('/client/newTransaction', authy, async (req, res) => {
         }
     }
 })
+
+// ************************************************** 
 app.get('/client/transactions', authy, async (req, res) => {
 
     const _id = req.headers.uid
@@ -239,12 +245,133 @@ app.get('/client/transactions', authy, async (req, res) => {
         res.json({ response: "invalid user" })
     }
     else {
-
         const result = await clients.find({ _id, parentId })
-
         res.json({ response: result })
     }
 })
+
+app.post('/shareRequest', authy, async (req, res) => {
+    const { clientId } = req.body;
+    const parentId = req.body.user._id;
+    const expireTime = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
+    const actulaTime = new Date(expireTime).toLocaleString('en-IN')
+    const shareToken = await jwtGenetator({ Tn: expireTime + parentId })
+    let result = await share.create({ clientId, shareToken, parentId, expireTime })
+
+    // console.log(result)
+    res.json({
+        "message ": 'share this link with your friend . this link will be invalid after 24 Hours ',
+        "link": `https://creditc.vercel.app/share/${result._id}`
+    })
+
+
+})
+
+/* Route : to show the data at client  */
+app.get('/share', async (req, res) => {
+    try {
+        const shareRequestId = req.headers.sharetoken;  /* id send by user */
+
+
+        if (shareRequestId.length > 9) {
+            const shareIdResult = await share.find({ _id: shareRequestId }) /*indicates the document id inwhich token info is seved */
+
+            // console.log("shareID", shareIdResult)
+
+
+            if (shareIdResult.length > 0) {
+
+                const { parentId, clientId, shareToken } = shareIdResult[0] /* parse parnetId clinetId and ShareToken from the database find operation result */
+                const tokenStatus = await jwtVerify(shareToken)  /* verify json tocken whick is seved in database */
+                //  if JWT is expired
+                if (tokenStatus === "jwt expired") {
+                    res.json({
+                        'type': 'Error',
+                        'message': 'Expired link !',
+
+
+                    })
+                    return
+                }
+
+                const parentData = await user.find({ _id: parentId })
+                const parentName = parentData[0].name
+                let clientData = await clients.find({ parentId, _id: clientId })
+                const { transactions, name } = clientData[0]
+                //to change the value accordind to user and calcualte some of recived and sent money
+                let totalSentAmount = 0
+                let totalRecivedAmount = 0
+                let changedTransactinFormat = transactions.map((data) => {
+                    // in==send *-1 & out =recive
+                    if (data.type == 'OUT') {
+                        data.type = 'recived'
+                        if (data.amount != 0) { data.amount = data.amount * -1 }
+                        totalRecivedAmount += data.amount
+                        return data
+                    }
+                    else if (data.type == 'IN') {
+                        data.type = 'sent'
+                        if (data.amount != 0) { data.amount = data.amount * -1 }
+                        totalSentAmount += data.amount
+                        return data
+                    }
+                    console.log(data.type)
+                })
+                const totalRemainingAmount = totalRecivedAmount - (totalSentAmount * -1)
+                console.table(transactions, changedTransactinFormat)
+                res.json({
+                    //   'shareTokenId': shareRequestId,
+                    //   'jsonToken': shareToken,
+                    //   'parentId': parentId,
+                    //   'clientId': clientId,
+                    // 'JWT tokenStatus': tokenStatus,
+                    // 'shareIdResult': shareIdResult
+                    // clientData,
+                    // parentData,
+                    // changedTransactinFormat,
+                    clientName: name,
+                    parentName,
+                    totalRecivedAmount,
+                    totalSentAmount,
+                    totalRemainingAmount,
+                    transactions
+
+                })
+                return
+
+            }
+            else {
+                res.json({
+                    'type': 'Error',
+                    'message': 'invalid Link ! 1',
+                    'shareIdResult': shareIdResult
+
+                })
+                return
+            }
+
+
+
+        }
+        else {
+            res.json({
+                'type': 'Error',
+                'message': 'invalid Link !',
+
+
+            })
+            return;
+        }
+        // console.log(req)
+
+    } catch (error) {
+        res.json({
+            error: 'internal server Error',
+            message: error.message
+        })
+    }
+})
+
 
 app.listen(port, (err) => {
     if (err) throw err;
