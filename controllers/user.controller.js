@@ -129,11 +129,11 @@ const login = async (req, res, next) => {
         // setting cookies options
         const cookieOptions = {
             expires: new Date(Date.now() + 27 * 24 * 60 * 60 * 1000),
-            httpOnly: true
+            httpOnly: true,
         };
 
         // return response with authorization token
-        return res.status(201).cookie("user", token, cookieOptions).json(new ApiResponse(true, false, "login successfully", { user: token }));
+        return res.cookie("user", token, cookieOptions).json(new ApiResponse(true, false, "login successfully", { user: token }));
 
 
     } catch (error) {
