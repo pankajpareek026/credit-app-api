@@ -56,7 +56,9 @@ const register = async (req, res, next) => {
         // Configuring JWT token options
         const options = {
             expires: new Date(Date.now() + 27 * 24 * 60 * 60 * 1000),
-            httpOnly: true
+            httpOnly: true,
+            sameSite: 'none',
+            secure: true,
         };
 
         // Sending JWT token as a cookie along with registration success message
