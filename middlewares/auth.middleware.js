@@ -22,7 +22,12 @@ async function authy(req, res, next) {
         console.log("TKN result =>", tokenResult)
         if (tokenResult.error) {
             const message = tokenResult.isExpired ? "session expired" : "unauthorized user access"
-            return next(new ApiError(401, message))
+            return res.status(401).json({
+                type: "error",
+                message: message,
+                isSuccess: false,
+                isError: true
+            })
         }
 
         req.body.user = tokenResult
