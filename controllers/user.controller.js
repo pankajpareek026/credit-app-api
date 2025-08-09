@@ -1,10 +1,18 @@
 const bcrypt = require('bcryptjs');
 const user = require("../Models/user.modal");
+const loginRecord = require("../Models/loginRecord.modal"); // Import login record model
 const ApiError = require("../utils/apiError.utils");
 const ApiResponse = require("../utils/apiResponse.utils");
 const jwtGenetator = require('../utils/jwtGenerator');
 const clients = require('../Models/client.modal');
 const share = require('../Models/share.modal');
+const { userSchemas } = require('../utils/validationSchemas');
+const { validateRequest } = require('../middleware/validation.middleware');
+const {
+    isValidEmail,
+    validatePasswordStrength,
+    validateStringLength
+} = require('../utils/validationUtils.js');
 
 
 
@@ -12,31 +20,29 @@ const share = require('../Models/share.modal');
 
 
 // to register new user 
-
 const register = async (req, res, next) => {
-
     try {
-        // Extracting name, email, and password from request body
-        const { name, email, pass } = req.body;
+        // Validate request body using Joi schema
+        const { error, value } = userSchemas.register.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
 
-        const errorMessage = []
-        // Checking if any required field is missing
-
-        !name && errorMessage.push("Name is required")
-        name && name?.length < 5 && errorMessage.push("Too shot name , minimum 5 characters required")
-        name && name?.length > 12 && errorMessage.push("Too long name , maximum 12 characters allowed")
-        !email && errorMessage.push("Email is required")
-        !pass && errorMessage.push("Password is required")
-
-        // if any of the fields are empty
-        if (errorMessage.length > 0) {
-            return next(new ApiError(400, errorMessage.join(' , ')));
+        if (error) {
+            const validationErrors = error.details.map(detail => ({
+                field: detail.path.join('.'),
+                message: detail.message,
+                value: detail.context?.value
+            }));
+            return next(ApiError.validationError(validationErrors));
         }
+
+        const { name, email, pass } = value;
 
         // Check if user already exists
         const userExist = await user.findOne({ email });
         if (userExist) {
-            return next(new ApiError(403, 'Email already exist'))
+            return next(ApiError.conflictError('Email already exists'));
         }
 
         // Encrypting password
@@ -50,35 +56,30 @@ const register = async (req, res, next) => {
         delete query.pass;
         delete query.email;
 
-        // Generate JWT token for authentication
-        // const token = await jwtGenetator(query, "28d");
-
-        // Configuring JWT token options
-        // const options = {
-        //     expires: new Date(Date.now() + 27 * 24 * 60 * 60 * 1000),
-        //     httpOnly: true,
-        //     sameSite: 'none',
-        //     secure: true,
-        // };
-
-        // Sending JWT token as a cookie along with registration success message
         return res.status(201).json(
-            new ApiResponse(true, false, "Registration successful", "")
+            ApiResponse.created(null, "Registration successful")
         );
 
     }
     catch (error) {
-        // Handling errors
-        console.log(error);
-        let errorMessage = error.message;
+        // Handle database errors
+        if (error.code === 11000) {
+            return next(ApiError.conflictError('Email already exists'));
+        }
 
-        // Parsing and formatting error messages
-        errorMessage = errorMessage.replaceAll('credit-users validation failed:', '');
-        errorMessage = errorMessage.replace(' name: ', '');
-        errorMessage = errorMessage.replace(' email: ', '');
-        errorMessage = errorMessage.replace(' pass: ', '');
+        // Handle validation errors
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors).map(err => ({
+                field: err.path,
+                message: err.message,
+                value: err.value
+            }));
+            return next(ApiError.validationError(validationErrors));
+        }
 
-        next(new ApiError(400, errorMessage))
+        // Handle other errors
+        console.error('Registration error:', error);
+        return next(ApiError.internalError('Registration failed'));
     }
 
 }
@@ -86,23 +87,29 @@ const register = async (req, res, next) => {
 // login user
 const login = async (req, res, next) => {
     try {
-        const { email, pass } = req.body;
-        const errorMessage = []
-        !email && errorMessage.push("Email is required")
-        !pass && errorMessage.push("Password is required")
+        // Validate request body using Joi schema
+        const { error, value } = userSchemas.login.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
 
-        // if any fields is missing
-        if (errorMessage.length > 0) {
-            return next(new ApiError(400, errorMessage.join(' , ')));
+        if (error) {
+            const validationErrors = error.details.map(detail => ({
+                field: detail.path.join('.'),
+                message: detail.message,
+                value: detail.context?.value
+            }));
+            return next(ApiError.validationError(validationErrors));
         }
+
+        const { email, pass } = value;
 
         //find user by email
         const userExists = await user.findOne({ email });
 
         // if user not found
         if (!userExists) {
-            // send error message to client
-            return next(new ApiError(404, 'User does not exist'));
+            return next(ApiError.notFoundError('User does not exist'));
         }
 
         // compare password in bd vs entered password
@@ -110,10 +117,9 @@ const login = async (req, res, next) => {
 
         // if password is incorrect
         if (!isPasswordValid) {
-            // send error message to client
-            return next(new ApiError(403, "Invalid password"))
+            return next(ApiError.authenticationError("Invalid password"));
         }
-
+        console.log("password is correct")
         // extract all values except _id
         const { name, email: userEmail, __v, token: tkn, ...userData } = userExists.toObject();
 
@@ -122,26 +128,103 @@ const login = async (req, res, next) => {
 
         // generate jwt token for authentication
         const token = await jwtGenetator(userData, "28d")
-
-        // if errror while generating token
+        console.log("token generated =>", token)
+        // if error while generating token
         if (token.error) {
-            // return error
-            console.error("Error generating token= >", token.message);
-            return next(new ApiError(500, "internal server error",));
+            console.error("Error generating token:", token.message);
+            return next(ApiError.internalError("Token generation failed"));
         }
+
+        // Create login record for successful authentication
+        try {
+            const { v4: uuidv4 } = require('uuid'); // Import UUID for session ID generation
+
+            // Utility functions for device detection
+            const detectDeviceType = (userAgent) => {
+                const ua = userAgent.toLowerCase();
+                if (/android|iphone|ipad|ipod|blackberry|windows phone/i.test(ua)) {
+                    if (/ipad/i.test(ua)) return 'tablet';
+                    return 'mobile';
+                }
+                if (/windows|macintosh|linux/i.test(ua)) {
+                    return 'desktop';
+                }
+                return 'unknown';
+            };
+
+            const detectPlatform = (userAgent) => {
+                const ua = userAgent.toLowerCase();
+                if (/android/i.test(ua)) return 'android';
+                if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+                if (/windows/i.test(ua)) return 'windows';
+                if (/macintosh/i.test(ua)) return 'macos';
+                if (/linux/i.test(ua)) return 'linux';
+                if (/chrome|firefox|safari|edge/i.test(ua)) return 'web';
+                return 'unknown';
+            };
+
+            const getClientIP = (req) => {
+                const forwarded = req.headers['x-forwarded-for'];
+                if (forwarded) {
+                    return forwarded.split(',')[0].trim();
+                }
+                const realIP = req.headers['x-real-ip'];
+                if (realIP) {
+                    return realIP;
+                }
+                return req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
+            };
+
+            // Create login record data
+            const userAgent = req.headers['user-agent'] || 'unknown';
+            const ipAddress = getClientIP(req);
+            const sessionId = uuidv4();
+            const deviceType = detectDeviceType(userAgent);
+            const platform = detectPlatform(userAgent);
+
+            const loginData = {
+                userId: userExists._id,
+                sessionId,
+                loginTime: new Date(),
+                loginStatus: 'success',
+                userAgent,
+                deviceType,
+                platform,
+                ipAddress,
+                appVersion: req.headers['app-version'] || '1.0.0',
+                apiVersion: 'v1',
+                metadata: {
+                    requestId: req.headers['x-request-id'] || '',
+                    referer: req.headers.referer || '',
+                    acceptLanguage: req.headers['accept-language'] || ''
+                }
+            };
+
+            // Create the login record asynchronously (don't block the response)
+            loginRecord.createLoginRecord(loginData).catch(error => {
+                console.error('Error creating login record:', error);
+                // Don't fail the login if login record creation fails
+            });
+
+            // Add session ID to the response for frontend tracking
+            userData.sessionId = sessionId;
+
+        } catch (loginRecordError) {
+            console.error('Error in login record creation:', loginRecordError);
+            // Continue with login even if login record creation fails
+        }
+
         // setting cookies options
         const cookieOptions = {
             expires: new Date(Date.now() + 27 * 24 * 60 * 60 * 1000),
             httpOnly: true,
             secure: true,
             sameSite: "none",
-
         };
 
         // return response with authorization token
         res.cookie("user", token, cookieOptions)
         return res.json(new ApiResponse(true, false, "login successfully", { user: token }));
-
 
     } catch (error) {
         //
@@ -154,8 +237,21 @@ const login = async (req, res, next) => {
 const logout = async (req, res, next) => {
     console.log(req.body);
     try {
-        // clear cookies 
+        // Get session ID from request body or headers
+        const sessionId = req.body.sessionId || req.headers['session-id'];
 
+        // Update logout time if session ID is available
+        if (sessionId) {
+            try {
+                await loginRecord.updateLogoutTime(sessionId, new Date());
+                console.log('Logout time updated for session:', sessionId);
+            } catch (loginRecordError) {
+                console.error('Error updating logout time:', loginRecordError);
+                // Don't fail logout if login record update fails
+            }
+        }
+
+        // clear cookies 
         res.clearCookie("user").json(new ApiResponse(true, false, "You've been successfully logged out. Thank you!"))
 
     } catch (error) {
