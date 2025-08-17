@@ -266,10 +266,19 @@ const profile = async (req, res, next) => {
     const currentTime = Date.now()
     try {
         const { _id } = req.body.user
-        console.log("parent =>", req.body.user)
-        // console.log(`req recived  name=>${name} , _ID=>${_id} `)
-        const { name } = await user.findOne({ _id })
-        console.log("Name: " + name)
+        console.log("🔍 User Profile - parent =>", req.body.user)
+
+        // Get user data including email
+        const userData = await user.findOne({ _id })
+        console.log("🔍 User Profile - userData =>", userData)
+
+        if (!userData) {
+            return next(new ApiError(404, "User not found"));
+        }
+
+        const { name, email } = userData
+        console.log("🔍 User Profile - Name: " + name + ", Email: " + email)
+
         const allClients = await clients.find({ parentId: _id }, { transactions: 0, parentId: 0 });
         let allSharedLinks = await share.find({ parentId: _id })
 
@@ -279,14 +288,23 @@ const profile = async (req, res, next) => {
                 isActive: currentTime < expireTime,
                 clientName, shareToken
             }
-
         })
-        console.log("Name=>", name)
-        console.log("all shared links =>", allSharedLinks)
+
+        console.log("🔍 User Profile - Name=>", name)
+        console.log("🔍 User Profile - Email=>", email)
+        console.log("🔍 User Profile - all shared links =>", allSharedLinks)
+
         return res.status(200).json(
-            new ApiResponse(true, false, "success", { name: name, symbol: name.charAt(0), allClients: allClients, allSharedLinks: allSharedLinks })
+            new ApiResponse(true, false, "success", {
+                name: name,
+                email: email,
+                symbol: name.charAt(0),
+                allClients: allClients,
+                allSharedLinks: allSharedLinks
+            })
         )
     } catch (error) {
+        console.error("🔍 User Profile - Error:", error.message);
         return next(new ApiError(500, error.message));
     }
 }
