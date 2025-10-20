@@ -1,4 +1,4 @@
-const { login, register, logout, profile } = require('../controllers/user.controller');
+const { login, register, logout, profile, verifyPasswordForPinReset, resetPin } = require('../controllers/user.controller');
 const authy = require('../middlewares/auth.middleware');
 
 const Router = require('express').Router;
@@ -7,6 +7,10 @@ router.route("/login").post(login)
 router.route("/register").post(register)
 router.route("/logout").post(authy, logout)
 router.route("/userProfile").get(authy, profile)
+
+// PIN reset routes
+router.route("/verify-password-for-pin-reset").post(verifyPasswordForPinReset)
+router.route("/reset-pin").post(resetPin)
 
 // Test endpoints
 router.route("/test").get((req, res) => {

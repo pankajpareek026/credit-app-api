@@ -1,15 +1,22 @@
-const { 
-    transactionDetails, 
-    editTransaction, 
-    newTransaction, 
-    allTransactions, 
-    searchTransaction, 
+const {
+    transactionDetails,
+    editTransaction,
+    newTransaction,
+    allTransactions,
+    searchTransaction,
     getTransactionDetails,
     batchCreateTransactions,
     getTransactionStatistics,
-    bulkUpdateTransactionVisibility
+    bulkUpdateTransactionVisibility,
+    uploadTransactionAttachment,
+    removeTransactionAttachment,
+    createSeparator,
+    updateSeparator,
+    deleteSeparator,
+    getTransactionAttachment
 } = require('../controllers/transaction.controller');
 const authy = require('../middlewares/auth.middleware');
+const { uploadSingle, uploadMultiple, handleUploadError } = require('../middleware/cloudinary_upload');
 
 const Router = require('express').Router
 const router = Router();
@@ -27,5 +34,14 @@ router.route('/client/batchTransactions').post(authy, batchCreateTransactions) /
 router.route('/client/statistics').get(authy, getTransactionStatistics) // get transaction statistics
 router.route('/client/bulkVisibility').patch(authy, bulkUpdateTransactionVisibility) // bulk update transaction visibility
 
+// File attachment routes
+router.route('/client/transaction/:transactionId/upload').post(authy, uploadSingle, handleUploadError, uploadTransactionAttachment) // upload file attachment
+router.route('/client/transaction/:transactionId/attachment/:attachmentId').delete(authy, removeTransactionAttachment) // remove file attachment
+router.route('/client/transaction/:transactionId/attachment/:attachmentId').get(authy, getTransactionAttachment) // get file attachment
+
+// Separator routes
+router.route('/client/separator').post(authy, createSeparator) // create separator
+router.route('/client/separator/:transactionId').put(authy, updateSeparator) // update separator
+router.route('/client/separator/:transactionId').delete(authy, deleteSeparator) // delete separator
 
 module.exports = router

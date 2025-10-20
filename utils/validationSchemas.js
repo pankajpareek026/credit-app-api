@@ -964,6 +964,391 @@ const vaultSchemas = {
     })
 };
 
+/**
+ * Expense Validation Schemas
+ */
+const expenseSchemas = {
+    // Create expense schema
+    create: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .required()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters',
+                'any.required': 'Title is required'
+            }),
+        amount: Joi.number()
+            .positive()
+            .required()
+            .messages({
+                'number.base': 'Amount must be a valid number',
+                'number.positive': 'Amount must be positive',
+                'any.required': 'Amount is required'
+            }),
+        date: Joi.date()
+            .max('now')
+            .required()
+            .messages({
+                'date.base': 'Date must be a valid date',
+                'date.max': 'Expense date cannot be in the future',
+                'any.required': 'Date is required'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .default('OTHER')
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        paymentMethod: Joi.string()
+            .valid('CASH', 'CARD', 'UPI', 'BANK', 'WALLET', 'OTHER')
+            .default('CASH')
+            .messages({
+                'any.only': 'Payment method must be one of the allowed values'
+            }),
+        tags: Joi.array()
+            .items(
+                Joi.string()
+                    .min(1)
+                    .max(20)
+                    .messages({
+                        'string.min': 'Tag must not be empty',
+                        'string.max': 'Tag must not exceed 20 characters'
+                    })
+            )
+            .optional()
+            .messages({
+                'array.base': 'Tags must be an array'
+            }),
+        notes: Joi.string()
+            .max(500)
+            .optional()
+            .messages({
+                'string.max': 'Notes must not exceed 500 characters'
+            })
+    }),
+
+    // Update expense schema
+    update: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters'
+            }),
+        amount: Joi.number()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Amount must be a valid number',
+                'number.positive': 'Amount must be positive'
+            }),
+        date: Joi.date()
+            .max('now')
+            .optional()
+            .messages({
+                'date.base': 'Date must be a valid date',
+                'date.max': 'Expense date cannot be in the future'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        paymentMethod: Joi.string()
+            .valid('CASH', 'CARD', 'UPI', 'BANK', 'WALLET', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Payment method must be one of the allowed values'
+            }),
+        tags: Joi.array()
+            .items(
+                Joi.string()
+                    .min(1)
+                    .max(20)
+                    .messages({
+                        'string.min': 'Tag must not be empty',
+                        'string.max': 'Tag must not exceed 20 characters'
+                    })
+            )
+            .optional()
+            .messages({
+                'array.base': 'Tags must be an array'
+            }),
+        notes: Joi.string()
+            .max(500)
+            .optional()
+            .messages({
+                'string.max': 'Notes must not exceed 500 characters'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Get expenses with filters schema
+    getExpenses: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .default(1)
+            .messages({
+                'number.base': 'Page must be a number',
+                'number.integer': 'Page must be an integer',
+                'number.min': 'Page must be at least 1'
+            }),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .default(20)
+            .messages({
+                'number.base': 'Limit must be a number',
+                'number.integer': 'Limit must be an integer',
+                'number.min': 'Limit must be at least 1',
+                'number.max': 'Limit must not exceed 100'
+            }),
+        search: Joi.string()
+            .min(2)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Search term must be at least 2 characters long',
+                'string.max': 'Search term must not exceed 100 characters'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        paymentMethod: Joi.string()
+            .valid('CASH', 'CARD', 'UPI', 'BANK', 'WALLET', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Payment method must be one of the allowed values'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            }),
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            }),
+        sortBy: Joi.string()
+            .valid('date', 'amount', 'title', 'category', 'createdAt')
+            .default('date')
+            .messages({
+                'any.only': 'sortBy must be one of the allowed values'
+            }),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .default('desc')
+            .messages({
+                'any.only': 'sortOrder must be either asc or desc'
+            })
+    }),
+
+    // Get expense statistics schema
+    getStatistics: Joi.object({
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        paymentMethod: Joi.string()
+            .valid('CASH', 'CARD', 'UPI', 'BANK', 'WALLET', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Payment method must be one of the allowed values'
+            })
+    }),
+
+    // Bulk create expenses schema
+    bulkCreate: Joi.object({
+        expenses: Joi.array()
+            .items(
+                Joi.object({
+                    title: Joi.string()
+                        .min(1)
+                        .max(100)
+                        .required()
+                        .messages({
+                            'string.min': 'Title must not be empty',
+                            'string.max': 'Title must not exceed 100 characters',
+                            'any.required': 'Title is required'
+                        }),
+                    amount: Joi.number()
+                        .positive()
+                        .required()
+                        .messages({
+                            'number.base': 'Amount must be a valid number',
+                            'number.positive': 'Amount must be positive',
+                            'any.required': 'Amount is required'
+                        }),
+                    date: Joi.date()
+                        .max('now')
+                        .required()
+                        .messages({
+                            'date.base': 'Date must be a valid date',
+                            'date.max': 'Expense date cannot be in the future',
+                            'any.required': 'Date is required'
+                        }),
+                    category: Joi.string()
+                        .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+                        .default('OTHER')
+                        .messages({
+                            'any.only': 'Category must be one of the allowed values'
+                        }),
+                    paymentMethod: Joi.string()
+                        .valid('CASH', 'CARD', 'UPI', 'BANK', 'WALLET', 'OTHER')
+                        .default('CASH')
+                        .messages({
+                            'any.only': 'Payment method must be one of the allowed values'
+                        }),
+                    tags: Joi.array()
+                        .items(
+                            Joi.string()
+                                .min(1)
+                                .max(20)
+                                .messages({
+                                    'string.min': 'Tag must not be empty',
+                                    'string.max': 'Tag must not exceed 20 characters'
+                                })
+                        )
+                        .optional()
+                        .messages({
+                            'array.base': 'Tags must be an array'
+                        }),
+                    notes: Joi.string()
+                        .max(500)
+                        .optional()
+                        .messages({
+                            'string.max': 'Notes must not exceed 500 characters'
+                        })
+                })
+            )
+            .min(1)
+            .max(100)
+            .required()
+            .messages({
+                'array.min': 'At least one expense is required',
+                'array.max': 'Maximum 100 expenses allowed per batch',
+                'any.required': 'Expenses array is required'
+            })
+    })
+};
+
+/**
+ * Tasks Validation Schemas
+ */
+const tasksSchemas = {
+    // Upsert entire tree (optional)
+    upsertTree: Joi.object({
+        mainLists: Joi.array().items(
+            Joi.object({
+                listId: Joi.string().optional(),
+                name: Joi.string().min(1).max(100).required(),
+                subLists: Joi.array().items(
+                    Joi.object({
+                        subListId: Joi.string().optional(),
+                        name: Joi.string().min(1).max(100).required(),
+                        tasks: Joi.array().items(
+                            Joi.object({
+                                taskId: Joi.string().optional(),
+                                title: Joi.string().min(1).max(200).required(),
+                                status: Joi.string().valid('Applied', 'Pending', 'Completed', 'In Progress').default('Pending'),
+                                jobUrl: Joi.string().uri().allow(null, ''),
+                                dueDate: Joi.date().allow(null),
+                                notes: Joi.string().max(2000).allow(null, ''),
+                                amount: Joi.number().positive().allow(null),
+                                subtasks: Joi.array().items(
+                                    Joi.object({
+                                        subTaskId: Joi.string().optional(),
+                                        title: Joi.string().min(1).max(200).required(),
+                                        status: Joi.string().valid('Pending', 'Completed', 'In Progress').default('Pending'),
+                                        dueDate: Joi.date().allow(null),
+                                    })
+                                ).default([])
+                            })
+                        ).default([])
+                    })
+                ).default([])
+            })
+        ).default([])
+    }),
+
+    // Create main list
+    createMainList: Joi.object({
+        name: Joi.string().min(1).max(100).required(),
+    }),
+
+    // Create sub-list
+    createSubList: Joi.object({
+        name: Joi.string().min(1).max(100).required(),
+    }),
+
+    // Create task
+    createTask: Joi.object({
+        title: Joi.string().min(1).max(200).required(),
+        status: Joi.string().valid('Applied', 'Pending', 'Completed', 'In Progress').default('Pending'),
+        jobUrl: Joi.string().uri().allow(null, ''),
+        dueDate: Joi.date().allow(null),
+        notes: Joi.string().max(2000).allow(null, ''),
+        amount: Joi.number().positive().allow(null),
+        subtasks: Joi.array().items(
+            Joi.object({
+                title: Joi.string().min(1).max(200).required(),
+                status: Joi.string().valid('Pending', 'Completed', 'In Progress').default('Pending'),
+                dueDate: Joi.date().allow(null),
+            })
+        ).default([])
+    }),
+
+    // Update task
+    updateTask: Joi.object({
+        title: Joi.string().min(1).max(200).optional(),
+        status: Joi.string().valid('Applied', 'Pending', 'Completed', 'In Progress').optional(),
+        jobUrl: Joi.string().uri().allow(null, ''),
+        dueDate: Joi.date().allow(null),
+        notes: Joi.string().max(2000).allow(null, ''),
+        amount: Joi.number().positive().allow(null),
+        subtasks: Joi.array().items(
+            Joi.object({
+                subTaskId: Joi.string().optional(),
+                title: Joi.string().min(1).max(200).required(),
+                status: Joi.string().valid('Pending', 'Completed', 'In Progress').default('Pending'),
+                dueDate: Joi.date().allow(null),
+            })
+        ).optional()
+    })
+};
+
 module.exports = {
     userSchemas,
     clientSchemas,
@@ -971,5 +1356,7 @@ module.exports = {
     shareSchemas,
     noteSchemas,
     billReminderSchemas,
-    vaultSchemas
+    vaultSchemas,
+    expenseSchemas,
+    tasksSchemas
 }; 

@@ -18,6 +18,8 @@ const billReminderRouter = require('./routes/billReminder.route.js')
 const noteRouter = require('./routes/note.route.js')
 const vaultRouter = require('./routes/vault.route.js')
 const loginRecordRouter = require('./routes/loginRecord.route.js')
+const expenseRouter = require('./routes/expense.route.js')
+const taskRouter = require('./routes/task.route.js')
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.middleware.js')
@@ -44,6 +46,8 @@ app.use('/api/billReminders', billReminderRouter)
 app.use('/api/notes', noteRouter)
 app.use('/api/vault', vaultRouter)
 app.use('/api/login-records', loginRecordRouter)
+app.use('/api/expenses', expenseRouter)
+app.use('/api/tasks', taskRouter)
 
 // 404 handler for unmatched routes
 app.use(notFoundHandler)

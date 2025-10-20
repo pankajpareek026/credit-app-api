@@ -9,6 +9,9 @@ const {
     validateDate,
     validateStringLength
 } = require('../utils/validationUtils');
+const path = require('path');
+const fs = require('fs');
+const { deleteFromCloudinary } = require('../middleware/cloudinary_upload');
 
 // to add new transaction to the database in reference of client
 const newTransaction = async (req, res, next) => {
@@ -757,6 +760,314 @@ const bulkUpdateTransactionVisibility = async (req, res, next) => {
     }
 };
 
+// Upload file attachment to transaction
+const uploadTransactionAttachment = async (req, res, next) => {
+    try {
+        const { transactionId } = req.params;
+        const parentId = req.body.user._id;
+
+        if (!transactionId) {
+            return next(new ApiError(400, "Transaction ID is required"));
+        }
+
+        if (!req.file) {
+            return next(new ApiError(400, "No file uploaded"));
+        }
+
+        // Verify transaction exists and belongs to user
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            parentId
+        });
+
+        if (!transaction) {
+            // Clean up uploaded file from Cloudinary if transaction doesn't exist
+            if (req.file.public_id) {
+                try {
+                    await deleteFromCloudinary(req.file.public_id);
+                } catch (deleteError) {
+                    console.error("Error cleaning up file from Cloudinary:", deleteError.message);
+                }
+            }
+            return next(new ApiError(404, "Transaction not found"));
+        }
+
+        // Create attachment object with Cloudinary data
+        const attachment = {
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            publicId: req.file.public_id,
+            secureUrl: req.file.secure_url,
+            url: req.file.url,
+            path: req.file.path || req.file.secure_url, // Fallback for backward compatibility
+            uploadedAt: new Date()
+        };
+
+        // Add attachment to transaction
+        const updatedTransaction = await Transaction.findByIdAndUpdate(
+            transactionId,
+            { $push: { attachments: attachment } },
+            { new: true }
+        );
+
+        return res.status(200).json(
+            new ApiResponse(true, false, "File uploaded successfully", {
+                attachment,
+                transactionId: updatedTransaction._id
+            })
+        );
+
+    } catch (error) {
+        console.error("Error in uploadTransactionAttachment:", error.message);
+
+        // Clean up uploaded file from Cloudinary on error
+        if (req.file && req.file.public_id) {
+            try {
+                await deleteFromCloudinary(req.file.public_id);
+            } catch (deleteError) {
+                console.error("Error cleaning up file from Cloudinary:", deleteError.message);
+            }
+        }
+
+        return next(new ApiError(500, "Failed to upload file"));
+    }
+};
+
+// Remove file attachment from transaction
+const removeTransactionAttachment = async (req, res, next) => {
+    try {
+        const { transactionId, attachmentId } = req.params;
+        const parentId = req.body.user._id;
+
+        if (!transactionId || !attachmentId) {
+            return next(new ApiError(400, "Transaction ID and Attachment ID are required"));
+        }
+
+        // Find transaction and verify ownership
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            parentId
+        });
+
+        if (!transaction) {
+            return next(new ApiError(404, "Transaction not found"));
+        }
+
+        // Find the attachment to remove
+        const attachment = transaction.attachments.id(attachmentId);
+        if (!attachment) {
+            return next(new ApiError(404, "Attachment not found"));
+        }
+
+        // Remove file from Cloudinary
+        try {
+            if (attachment.publicId) {
+                await deleteFromCloudinary(attachment.publicId);
+            }
+        } catch (fileError) {
+            console.error("Error removing file from Cloudinary:", fileError.message);
+            // Continue with database removal even if Cloudinary deletion fails
+        }
+
+        // Remove attachment from transaction
+        await Transaction.findByIdAndUpdate(
+            transactionId,
+            { $pull: { attachments: { _id: attachmentId } } }
+        );
+
+        return res.status(200).json(
+            new ApiResponse(true, false, "Attachment removed successfully")
+        );
+
+    } catch (error) {
+        console.error("Error in removeTransactionAttachment:", error.message);
+        return next(new ApiError(500, "Failed to remove attachment"));
+    }
+};
+
+// Create separator
+const createSeparator = async (req, res, next) => {
+    try {
+        const { clientid: clientId } = req.headers;
+        const parentId = req.body.user._id;
+        const { title, description, color, position } = req.body;
+
+        if (!clientId) {
+            return next(new ApiError(400, "Client ID is required"));
+        }
+
+        if (!title || title.trim().length === 0) {
+            return next(new ApiError(400, "Separator title is required"));
+        }
+
+        // Verify client exists
+        const client = await clients.findOne({
+            _id: clientId,
+            parentId
+        });
+
+        if (!client) {
+            return next(new ApiError(404, "Client not found"));
+        }
+
+        // Create separator transaction
+        const separatorTransaction = await Transaction.create({
+            clientId: mongoose.Types.ObjectId(clientId),
+            parentId,
+            amount: 0, // Separators have no amount
+            date: new Date(),
+            dis: title, // Use title as description
+            type: "SEPARATOR", // Special type for separators
+            isSeparator: true,
+            separator: {
+                title: title.trim(),
+                description: description ? description.trim() : "",
+                color: color || "#3B82F6",
+                position: position || 0,
+                isVisible: true
+            },
+            position: position || 0
+        });
+
+        return res.status(201).json(
+            new ApiResponse(true, false, "Separator created successfully", separatorTransaction)
+        );
+
+    } catch (error) {
+        console.error("Error in createSeparator:", error.message);
+        return next(new ApiError(500, "Failed to create separator"));
+    }
+};
+
+// Update separator
+const updateSeparator = async (req, res, next) => {
+    try {
+        const { transactionId } = req.params;
+        const parentId = req.body.user._id;
+        const { title, description, color, position, isVisible } = req.body;
+
+        if (!title || title.trim().length === 0) {
+            return next(new ApiError(400, "Separator title is required"));
+        }
+
+        // Find and verify separator transaction
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            parentId,
+            isSeparator: true
+        });
+
+        if (!transaction) {
+            return next(new ApiError(404, "Separator not found"));
+        }
+
+        // Update separator
+        const updatedTransaction = await Transaction.findByIdAndUpdate(
+            transactionId,
+            {
+                $set: {
+                    dis: title.trim(),
+                    separator: {
+                        title: title.trim(),
+                        description: description ? description.trim() : "",
+                        color: color || transaction.separator.color,
+                        position: position !== undefined ? position : transaction.separator.position,
+                        isVisible: isVisible !== undefined ? isVisible : transaction.separator.isVisible
+                    },
+                    position: position !== undefined ? position : transaction.position
+                }
+            },
+            { new: true }
+        );
+
+        return res.status(200).json(
+            new ApiResponse(true, false, "Separator updated successfully", updatedTransaction)
+        );
+
+    } catch (error) {
+        console.error("Error in updateSeparator:", error.message);
+        return next(new ApiError(500, "Failed to update separator"));
+    }
+};
+
+// Delete separator
+const deleteSeparator = async (req, res, next) => {
+    try {
+        const { transactionId } = req.params;
+        const parentId = req.body.user._id;
+
+        // Find and verify separator transaction
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            parentId,
+            isSeparator: true
+        });
+
+        if (!transaction) {
+            return next(new ApiError(404, "Separator not found"));
+        }
+
+        // Delete separator transaction
+        await Transaction.findByIdAndDelete(transactionId);
+
+        return res.status(200).json(
+            new ApiResponse(true, false, "Separator deleted successfully")
+        );
+
+    } catch (error) {
+        console.error("Error in deleteSeparator:", error.message);
+        return next(new ApiError(500, "Failed to delete separator"));
+    }
+};
+
+// Get file attachment
+const getTransactionAttachment = async (req, res, next) => {
+    try {
+        const { transactionId, attachmentId } = req.params;
+        const parentId = req.body.user._id;
+
+        // Find transaction and verify ownership
+        const transaction = await Transaction.findOne({
+            _id: transactionId,
+            parentId
+        });
+
+        if (!transaction) {
+            return next(new ApiError(404, "Transaction not found"));
+        }
+
+        // Find the attachment
+        const attachment = transaction.attachments.id(attachmentId);
+        if (!attachment) {
+            return next(new ApiError(404, "Attachment not found"));
+        }
+
+        // For Cloudinary files, redirect to the secure URL
+        if (attachment.secureUrl) {
+            return res.redirect(attachment.secureUrl);
+        }
+
+        // Fallback for legacy files (if any)
+        if (attachment.path && fs.existsSync(attachment.path)) {
+            // Set appropriate headers
+            res.setHeader('Content-Type', attachment.mimetype);
+            res.setHeader('Content-Disposition', `inline; filename="${attachment.originalName}"`);
+
+            // Stream the file
+            const fileStream = fs.createReadStream(attachment.path);
+            fileStream.pipe(res);
+        } else {
+            return next(new ApiError(404, "File not found"));
+        }
+
+    } catch (error) {
+        console.error("Error in getTransactionAttachment:", error.message);
+        return next(new ApiError(500, "Failed to retrieve attachment"));
+    }
+};
+
 module.exports = {
     newTransaction,
     editTransaction,
@@ -766,5 +1077,11 @@ module.exports = {
     getTransactionDetails,
     batchCreateTransactions,
     getTransactionStatistics,
-    bulkUpdateTransactionVisibility
+    bulkUpdateTransactionVisibility,
+    uploadTransactionAttachment,
+    removeTransactionAttachment,
+    createSeparator,
+    updateSeparator,
+    deleteSeparator,
+    getTransactionAttachment
 }

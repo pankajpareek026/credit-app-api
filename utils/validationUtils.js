@@ -10,7 +10,7 @@
  */
 const isValidEmail = (email) => {
     if (!email || typeof email !== 'string') return false;
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email.trim());
 };
@@ -22,15 +22,15 @@ const isValidEmail = (email) => {
  */
 const isValidPhoneNumber = (phone) => {
     if (!phone || typeof phone !== 'string') return false;
-    
+
     // Remove all non-digit characters except +
     const cleaned = phone.replace(/[^\d+]/g, '');
-    
+
     // Check if it starts with + and has 7-15 digits
     if (cleaned.startsWith('+')) {
         return /^\+[1-9]\d{6,14}$/.test(cleaned);
     }
-    
+
     // Check if it's a valid number without + (7-15 digits)
     return /^[1-9]\d{6,14}$/.test(cleaned);
 };
@@ -115,7 +115,7 @@ const validateAmount = (amount) => {
     }
 
     const numAmount = parseFloat(amount);
-    
+
     if (isNaN(numAmount)) {
         return {
             isValid: false,
@@ -182,7 +182,7 @@ const validateDate = (date, options = {}) => {
     }
 
     const dateObj = new Date(date);
-    
+
     if (isNaN(dateObj.getTime())) {
         return {
             isValid: false,
@@ -193,9 +193,11 @@ const validateDate = (date, options = {}) => {
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Check if future dates are allowed
-    if (!allowFuture && dateObj > today) {
+    if (!allowFuture && dateObj >= tomorrow) {
         return {
             isValid: false,
             value: null,
@@ -259,7 +261,7 @@ const validateUrl = (url) => {
     try {
         const urlObj = new URL(url);
         const validProtocols = ['http:', 'https:'];
-        
+
         if (!validProtocols.includes(urlObj.protocol)) {
             return {
                 isValid: false,
@@ -300,7 +302,7 @@ const validateCurrency = (currency) => {
     }
 
     const validCurrencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'SEK'];
-    
+
     if (!validCurrencies.includes(currency.toUpperCase())) {
         return {
             isValid: false,
@@ -375,7 +377,7 @@ const validateNumberRange = (num, min = -Infinity, max = Infinity) => {
     }
 
     const number = parseFloat(num);
-    
+
     if (isNaN(number)) {
         return {
             isValid: false,
@@ -533,7 +535,7 @@ const validateBoolean = (value) => {
  */
 const sanitizeString = (str) => {
     if (!str || typeof str !== 'string') return '';
-    
+
     return str
         .replace(/<[^>]*>/g, '') // Remove HTML tags
         .replace(/[<>]/g, '') // Remove < and >
@@ -552,7 +554,7 @@ const sanitizeString = (str) => {
  */
 const formatCurrency = (amount, currency = 'INR') => {
     if (!amount || isNaN(amount)) return '₹0.00';
-    
+
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: currency,
@@ -569,14 +571,14 @@ const formatCurrency = (amount, currency = 'INR') => {
  */
 const formatDate = (date, format = 'YYYY-MM-DD') => {
     if (!date) return '';
-    
+
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) return '';
-    
+
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const day = String(dateObj.getDate()).padStart(2, '0');
-    
+
     return format
         .replace('YYYY', year)
         .replace('MM', month)
@@ -592,7 +594,7 @@ const formatDate = (date, format = 'YYYY-MM-DD') => {
  */
 const generateValidationMessage = (field, rule, value = null) => {
     const fieldName = field.charAt(0).toUpperCase() + field.slice(1);
-    
+
     switch (rule) {
         case 'required':
             return `${fieldName} is required`;

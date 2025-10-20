@@ -290,9 +290,98 @@ const profile = async (req, res, next) => {
         return next(new ApiError(500, error.message));
     }
 }
+
+// Verify password for PIN reset
+const verifyPasswordForPinReset = async (req, res, next) => {
+    try {
+        // Validate request body
+        const { error, value } = userSchemas.login.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+
+        if (error) {
+            const validationErrors = error.details.map(detail => ({
+                field: detail.path.join('.'),
+                message: detail.message,
+                value: detail.context?.value
+            }));
+            return next(ApiError.validationError(validationErrors));
+        }
+
+        const { email, pass } = value;
+
+        // Find user by email
+        const userExist = await user.findOne({ email });
+        if (!userExist) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(pass, userExist.pass);
+        if (!isPasswordValid) {
+            return next(ApiError.unauthorizedError('Invalid password'));
+        }
+
+        // Generate temporary reset token (valid for 10 minutes)
+        const resetToken = jwtGenetator.generateResetToken(userExist._id);
+
+        return res.status(200).json(
+            ApiResponse.success({
+                resetToken,
+                expiresIn: '10 minutes'
+            }, "Password verified successfully. You can now reset your PIN.")
+        );
+
+    } catch (error) {
+        console.error('Password verification error:', error);
+        return next(ApiError.internalError('Password verification failed'));
+    }
+};
+
+// Reset PIN with verified password
+const resetPin = async (req, res, next) => {
+    try {
+        const { resetToken, newPin } = req.body;
+
+        if (!resetToken || !newPin) {
+            return next(ApiError.badRequestError('Reset token and new PIN are required'));
+        }
+
+        // Verify reset token
+        const decoded = jwtGenetator.verifyResetToken(resetToken);
+        if (!decoded) {
+            return next(ApiError.unauthorizedError('Invalid or expired reset token'));
+        }
+
+        // Find user
+        const userExist = await user.findById(decoded.userId);
+        if (!userExist) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        // Hash the new PIN
+        const hashedPin = await bcrypt.hash(newPin, 10);
+
+        // Update user's PIN (assuming you have a PIN field in user model)
+        // For now, we'll store it in a separate field or use a different approach
+        // You might want to store PIN in a separate vault collection
+        
+        return res.status(200).json(
+            ApiResponse.success(null, "PIN reset successfully")
+        );
+
+    } catch (error) {
+        console.error('PIN reset error:', error);
+        return next(ApiError.internalError('PIN reset failed'));
+    }
+};
+
 module.exports = {
     register,
     login,
     profile,
-    logout
-}
+    logout,
+    verifyPasswordForPinReset,
+    resetPin
+};

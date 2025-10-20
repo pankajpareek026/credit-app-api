@@ -561,4 +561,263 @@ CROSS_ORIGIN=http://localhost:3000
 
 ---
 
+## 11. Expenses Management API
+
+### Base Path: `/api/expenses`
+
+#### 11.1 Create Expense
+**POST** `/api/expenses`
+
+**Request Body:**
+```json
+{
+  "title": "Lunch at Restaurant",
+  "amount": 25.50,
+  "date": "2024-01-15T12:30:00.000Z",
+  "category": "FOOD",
+  "paymentMethod": "CARD",
+  "tags": ["lunch", "restaurant"],
+  "notes": "Business lunch with client"
+}
+```
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expense created successfully",
+  "responseData": {
+    "_id": "507f1f77bcf86cd799439011",
+    "title": "Lunch at Restaurant",
+    "amount": 25.50,
+    "date": "2024-01-15T12:30:00.000Z",
+    "category": "FOOD",
+    "paymentMethod": "CARD",
+    "tags": ["lunch", "restaurant"],
+    "notes": "Business lunch with client",
+    "isActive": true,
+    "parentId": "507f1f77bcf86cd799439012",
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+#### 11.2 Get All Expenses
+**GET** `/api/expenses`
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 20, max: 100)
+- `search` (optional): Search in title, notes, or tags
+- `category` (optional): Filter by category
+- `paymentMethod` (optional): Filter by payment method
+- `isActive` (optional): Filter by active status (default: true)
+- `startDate` (optional): Filter from date
+- `endDate` (optional): Filter to date
+- `sortBy` (optional): Sort field (date, amount, title, category, createdAt)
+- `sortOrder` (optional): Sort order (asc, desc)
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expenses retrieved successfully",
+  "responseData": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "title": "Lunch at Restaurant",
+      "amount": 25.50,
+      "date": "2024-01-15T12:30:00.000Z",
+      "category": "FOOD",
+      "paymentMethod": "CARD",
+      "tags": ["lunch", "restaurant"],
+      "notes": "Business lunch with client",
+      "isActive": true,
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 5,
+    "totalItems": 100,
+    "itemsPerPage": 20,
+    "hasNextPage": true,
+    "hasPrevPage": false
+  }
+}
+```
+
+#### 11.3 Get Single Expense
+**GET** `/api/expenses/:expenseId`
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expense retrieved successfully",
+  "responseData": {
+    "_id": "507f1f77bcf86cd799439011",
+    "title": "Lunch at Restaurant",
+    "amount": 25.50,
+    "date": "2024-01-15T12:30:00.000Z",
+    "category": "FOOD",
+    "paymentMethod": "CARD",
+    "tags": ["lunch", "restaurant"],
+    "notes": "Business lunch with client",
+    "isActive": true,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+#### 11.4 Update Expense
+**PUT** `/api/expenses/:expenseId`
+
+**Request Body:**
+```json
+{
+  "title": "Updated Lunch at Restaurant",
+  "amount": 30.00,
+  "category": "ENTERTAINMENT",
+  "notes": "Updated business lunch"
+}
+```
+
+#### 11.5 Delete Expense
+**DELETE** `/api/expenses/:expenseId`
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expense deleted successfully",
+  "responseData": null
+}
+```
+
+#### 11.6 Get Expense Statistics
+**GET** `/api/expenses/statistics`
+
+**Query Parameters:**
+- `startDate` (optional): Start date for statistics
+- `endDate` (optional): End date for statistics
+- `category` (optional): Filter by category
+- `paymentMethod` (optional): Filter by payment method
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expense statistics retrieved successfully",
+  "responseData": {
+    "totalExpenses": 150,
+    "totalAmount": 2500.50,
+    "averageAmount": 16.67,
+    "categoryBreakdown": [
+      {
+        "_id": "FOOD",
+        "total": 800.50,
+        "count": 45
+      },
+      {
+        "_id": "TRANSPORT",
+        "total": 300.00,
+        "count": 25
+      }
+    ],
+    "paymentMethodBreakdown": [
+      {
+        "_id": "CARD",
+        "total": 1200.00,
+        "count": 60
+      },
+      {
+        "_id": "CASH",
+        "total": 800.50,
+        "count": 40
+      }
+    ],
+    "dailyBreakdown": [
+      {
+        "_id": {
+          "year": 2024,
+          "month": 1,
+          "day": 15
+        },
+        "total": 125.50,
+        "count": 8
+      }
+    ]
+  }
+}
+```
+
+#### 11.7 Bulk Create Expenses
+**POST** `/api/expenses/bulk`
+
+**Request Body:**
+```json
+{
+  "expenses": [
+    {
+      "title": "Coffee",
+      "amount": 5.50,
+      "date": "2024-01-15T08:00:00.000Z",
+      "category": "FOOD",
+      "paymentMethod": "CASH"
+    },
+    {
+      "title": "Bus Ticket",
+      "amount": 2.00,
+      "date": "2024-01-15T09:00:00.000Z",
+      "category": "TRANSPORT",
+      "paymentMethod": "CASH"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "isSuccess": true,
+  "isError": false,
+  "message": "Expenses created successfully",
+  "responseData": {
+    "expenses": [...],
+    "totalCreated": 2,
+    "totalAmount": 7.50
+  }
+}
+```
+
+### Expense Categories
+- `FOOD` - Food and beverages
+- `TRANSPORT` - Transportation costs
+- `BILLS` - Utility bills and subscriptions
+- `ENTERTAINMENT` - Entertainment and leisure
+- `HEALTH` - Healthcare and medical expenses
+- `SHOPPING` - Shopping and retail
+- `EDUCATION` - Education and learning
+- `INVESTMENT` - Investments and savings
+- `OTHER` - Other expenses
+
+### Payment Methods
+- `CASH` - Cash payments
+- `CARD` - Credit/Debit card
+- `UPI` - UPI payments
+- `BANK` - Bank transfers
+- `WALLET` - Digital wallet
+- `OTHER` - Other payment methods
+
+---
+
 This enhanced API provides comprehensive support for the Flutter mobile application's new features while maintaining backward compatibility with existing functionality. 
