@@ -315,10 +315,6 @@ const searchTransaction = async (req, res, next) => {
 
         // Convert the query to a number
         const numericQuery = parseFloat(query);
-        console.log("num q=>", numericQuery)
-        console.log("clientId =>", clientId);
-        console.log("query =>", query);
-        console.log({ clientId: clientId, parentId, query });
 
 
 
@@ -348,7 +344,6 @@ const searchTransaction = async (req, res, next) => {
             ]
 
         );
-        console.log("Result: " + result);
 
 
         // if transaction found 
@@ -386,8 +381,6 @@ const allTransactions = async (req, res, next) => {
     try {
         const clientId = req.headers.clientid
         const parentId = req.body.user._id;
-        console.log("parent Id =>>", parentId)
-        console.log("client Id =>>", clientId)
         if (!clientId || !parentId) {
             return next(new ApiError(401, "Invalid user"))
         }
@@ -470,7 +463,6 @@ const allTransactions = async (req, res, next) => {
 
 
         )
-        console.log("result: " + result)
 
         // Handle case where no client is found or no transactions exist
         if (!result || result.length === 0) {
@@ -508,14 +500,12 @@ const allTransactions = async (req, res, next) => {
             clientData.trns = [];
         }
 
-        console.log("Cleaned transactions count: " + clientData.trns.length);
 
         return res.status(200).json(
             new ApiResponse(true, false, "success", clientData)
         )
 
     } catch (error) {
-        console.log("error: " + error)
         return next(new ApiError(500, error.message))
     }
 }
@@ -526,8 +516,6 @@ const getTransactionDetails = async (req, res, next) => {
         const { transactionId } = req.params;
         const parentId = req.body.user._id;
 
-        console.log("Getting transaction details for ID:", transactionId);
-        console.log("Parent ID:", parentId);
 
         if (!transactionId || !parentId) {
             return next(new ApiError(400, "Missing required parameters"));
@@ -561,14 +549,12 @@ const getTransactionDetails = async (req, res, next) => {
             updatedAt: transaction.updatedAt
         };
 
-        console.log("Transaction details:", transactionDetails);
 
         return res.status(200).json(
             new ApiResponse(true, false, "Transaction details retrieved successfully", transactionDetails)
         );
 
     } catch (error) {
-        console.log("Error getting transaction details:", error);
         return next(new ApiError(500, error.message));
     }
 }

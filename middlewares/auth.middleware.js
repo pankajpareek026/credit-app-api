@@ -3,13 +3,11 @@ const jwtVerify = require("../utils/jwtVerify");
 
 async function authy(req, res, next) {
     try {
-        console.log(req.headers)
         var origin = req.get('origin');
         const token = req.cookies.user
         const cookies = req.cookies.user
         const pKey = process.env.PKEY
         const authToken = req.headers.token
-        console.log("cookies=>>>>>", cookies)
 
         // Check if token is missing or undefined
         if (!authToken && cookies === "undefined") {
@@ -19,7 +17,6 @@ async function authy(req, res, next) {
         }
 
         const tokenResult = await jwtVerify(authToken, pKey)
-        console.log("TKN result =>", tokenResult)
         if (tokenResult.error) {
             const message = tokenResult.isExpired ? "session expired" : "unauthorized user access"
             return res.status(401).json({
@@ -34,7 +31,6 @@ async function authy(req, res, next) {
         next()
     } catch (error) {
         // Handle internal server error
-        console.log(error);
         res.status(500).json(
             {
                 type: 'error',
