@@ -119,7 +119,6 @@ const login = async (req, res, next) => {
         if (!isPasswordValid) {
             return next(ApiError.authenticationError("Invalid password"));
         }
-        console.log("password is correct")
         // extract all values except _id
         const { name, email: userEmail, __v, token: tkn, ...userData } = userExists.toObject();
 
@@ -128,7 +127,6 @@ const login = async (req, res, next) => {
 
         // generate jwt token for authentication
         const token = await jwtGenetator(userData, "28d")
-        console.log("token generated =>", token)
         // if error while generating token
         if (token.error) {
             console.error("Error generating token:", token.message);
@@ -235,7 +233,6 @@ const login = async (req, res, next) => {
 
 // to logout user 
 const logout = async (req, res, next) => {
-    console.log(req.body);
     try {
         // Get session ID from request body or headers
         const sessionId = req.body.sessionId || req.headers['session-id'];
@@ -244,7 +241,6 @@ const logout = async (req, res, next) => {
         if (sessionId) {
             try {
                 await loginRecord.updateLogoutTime(sessionId, new Date());
-                console.log('Logout time updated for session:', sessionId);
             } catch (loginRecordError) {
                 console.error('Error updating logout time:', loginRecordError);
                 // Don't fail logout if login record update fails
@@ -256,7 +252,6 @@ const logout = async (req, res, next) => {
 
     } catch (error) {
         // if any error while logging out
-        console.log("logout error: " + error)
         return next(new ApiError(500, error.message))
     }
 }
@@ -266,10 +261,8 @@ const profile = async (req, res, next) => {
     const currentTime = Date.now()
     try {
         const { _id } = req.body.user
-        console.log("parent =>", req.body.user)
         // console.log(`req recived  name=>${name} , _ID=>${_id} `)
         const { name } = await user.findOne({ _id })
-        console.log("Name: " + name)
         const allClients = await clients.find({ parentId: _id }, { transactions: 0, parentId: 0 });
         let allSharedLinks = await share.find({ parentId: _id })
 
@@ -281,8 +274,6 @@ const profile = async (req, res, next) => {
             }
 
         })
-        console.log("Name=>", name)
-        console.log("all shared links =>", allSharedLinks)
         return res.status(200).json(
             new ApiResponse(true, false, "success", { name: name, symbol: name.charAt(0), allClients: allClients, allSharedLinks: allSharedLinks })
         )

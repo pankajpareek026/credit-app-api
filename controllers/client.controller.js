@@ -31,8 +31,6 @@ const newClient = async (req, res, next) => {
         const parentId = req.body.user._id;
         const { name, phoneNumber, email, notes } = value;
 
-        console.log("🔍 DEBUG newClient - parentId:", parentId);
-        console.log("🔍 DEBUG newClient - name:", name);
 
         // Check if client with same name already exists for this user
         const existingClient = await clients.findOne({
@@ -163,11 +161,8 @@ const allClients = async (req, res, next) => {
     try {
         const { _id: parentId } = req.body.user;
 
-        console.log("🔍 DEBUG allClients - Full req.body.user:", req.body.user);
-        console.log("🔍 DEBUG allClients - parentId:", parentId);
 
         if (!parentId) {
-            console.log("❌ DEBUG allClients - No parentId found");
             return next(ApiError.authenticationError("Unauthorized user"));
         }
 
@@ -187,20 +182,12 @@ const allClients = async (req, res, next) => {
 
         const skip = (pageNum - 1) * limitNum;
 
-        console.log("🔍 DEBUG allClients - Query conditions:", { parentId, isActive: true });
 
         // Debug: Check total clients in database
         const totalClientsInDB = await clients.countDocuments({});
         const totalActiveClientsInDB = await clients.countDocuments({ isActive: true });
         const clientsForThisUser = await clients.countDocuments({ parentId, isActive: true });
 
-        console.log("🔍 DEBUG allClients - Database stats:", {
-            totalClientsInDB,
-            totalActiveClientsInDB,
-            clientsForThisUser,
-            parentIdType: typeof parentId,
-            parentIdValue: parentId
-        });
 
         let result = await clients.aggregate([
             {
@@ -271,12 +258,6 @@ const allClients = async (req, res, next) => {
         const totalCount = result[0].totalCount[0]?.count || 0;
         const totalPages = Math.ceil(totalCount / limitNum);
 
-        console.log("🔍 DEBUG allClients - Query result:", {
-            clientsDataLength: clientsData.length,
-            totalCount,
-            totalPages,
-            sampleData: clientsData.slice(0, 2) // Show first 2 clients if any
-        });
 
         const pagination = {
             currentPage: pageNum,
@@ -287,13 +268,11 @@ const allClients = async (req, res, next) => {
         };
 
         if (clientsData.length > 0) {
-            console.log("✅ DEBUG allClients - Returning clients successfully");
             return res.status(200).json(
                 ApiResponse.paginated(clientsData, "Clients retrieved successfully", pagination)
             );
         }
 
-        console.log("⚠️  DEBUG allClients - No clients found for user");
         return res.status(200).json(
             ApiResponse.success([], "No clients found")
         );
