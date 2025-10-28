@@ -7,7 +7,7 @@ async function authy(req, res, next) {
         const token = req.cookies.user
         const cookies = req.cookies.user
         const pKey = process.env.PKEY
-        const authToken = req.headers.token
+        const authToken = req.headers.token || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.substring(7) : null)
 
         // Check if token is missing or undefined
         if (!authToken && cookies === "undefined") {

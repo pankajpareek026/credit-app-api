@@ -1,52 +1,40 @@
 const { default: mongoose } = require("mongoose");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const { encryptWithKey, decryptWithKey, getUserVaultKey } = require("../utils/vaultCrypto");
 const Credential = require("../Models/credential.modal");
 const ApiError = require("../utils/apiError.utils");
 const ApiResponse = require("../utils/apiResponse.utils");
 
-// Encryption key (in production, this should be stored in environment variables)
-const VAULT_ENCRYPTION_KEY = process.env.VAULT_ENCRYPTION_KEY || 'your-secure-vault-encryption-key-32-chars-long';
-const ALGORITHM = 'aes-256-cbc';
-
-// Encrypt sensitive data
-const encryptData = (data) => {
-  if (!data) return null;
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipher(ALGORITHM, VAULT_ENCRYPTION_KEY);
-  let encrypted = cipher.update(data, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return iv.toString('hex') + ':' + encrypted;
+// AEAD AES-256-GCM with per-user derived key
+const encryptData = (data, userId) => {
+    if (!data) return null;
+    const key = getUserVaultKey(userId);
+    return encryptWithKey(data, key, userId);
 };
 
-// Decrypt sensitive data
-const decryptData = (encryptedData) => {
-  if (!encryptedData) return null;
-  try {
-    const textParts = encryptedData.split(':');
-    const iv = Buffer.from(textParts.shift(), 'hex');
-    const encryptedText = textParts.join(':');
-    const decipher = crypto.createDecipher(ALGORITHM, VAULT_ENCRYPTION_KEY);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (error) {
-    return null;
-  }
+const decryptData = (cipherText, userId) => {
+    if (!cipherText) return null;
+    const key = getUserVaultKey(userId);
+    return decryptWithKey(cipherText, key, userId);
 };
 
 // Create new credential
 const createCredential = async (req, res, next) => {
     try {
         const parentId = req.body.user._id;
-        const { 
-            title, 
-            username, 
-            password, 
-            url, 
-            notes, 
+        const {
+            title,
+            username,
+            password,
+            url,
+            notes,
             category,
-            isActive = true 
+            isActive = true,
+            iconUrl,
+            tags,
+            additionalFields,
+            securityLevel
         } = req.body;
 
         // Validation
@@ -60,12 +48,21 @@ const createCredential = async (req, res, next) => {
         }
 
         // Encrypt sensitive data
-        const encryptedUsername = encryptData(username);
-        const encryptedPassword = encryptData(password);
-        const encryptedUrl = url ? encryptData(url) : null;
-        const encryptedNotes = notes ? encryptData(notes) : null;
+        const encryptedUsername = encryptData(username, parentId);
+        const encryptedPassword = encryptData(password, parentId);
+        const encryptedUrl = url ? encryptData(url, parentId) : null;
+        const encryptedNotes = notes ? encryptData(notes, parentId) : null;
 
         // Create credential
+        // Encrypt dynamic additional fields values
+        let encryptedAdditional = undefined;
+        if (additionalFields && typeof additionalFields === 'object') {
+            encryptedAdditional = {};
+            for (const [k, v] of Object.entries(additionalFields)) {
+                encryptedAdditional[k] = encryptData(String(v), parentId);
+            }
+        }
+
         const credential = await Credential.create({
             parentId,
             title: title.trim(),
@@ -74,7 +71,11 @@ const createCredential = async (req, res, next) => {
             url: encryptedUrl,
             notes: encryptedNotes,
             category: category || 'general',
-            isActive
+            isActive,
+            iconUrl: iconUrl || null,
+            tags: Array.isArray(tags) ? tags.slice(0, 50) : [],
+            additionalFields: encryptedAdditional,
+            securityLevel: securityLevel || 'medium'
         });
 
         return res.status(201).json(
@@ -129,18 +130,30 @@ const getAllCredentials = async (req, res, next) => {
             .lean();
 
         // Decrypt sensitive data for display
-        const decryptedCredentials = credentials.map(credential => ({
-            id: credential._id,
-            title: credential.title,
-            username: decryptData(credential.username) || '***',
-            password: '••••••••',
-            url: credential.url ? decryptData(credential.url) : null,
-            notes: credential.notes ? decryptData(credential.notes) : null,
-            category: credential.category,
-            isActive: credential.isActive,
-            createdAt: credential.createdAt,
-            updatedAt: credential.updatedAt
-        }));
+        const decryptedCredentials = credentials.map(credential => {
+            const additional = {};
+            if (credential.additionalFields) {
+                for (const [k, v] of Object.entries(credential.additionalFields)) {
+                    additional[k] = decryptData(v, parentId);
+                }
+            }
+            return {
+                id: credential._id,
+                title: credential.title,
+                username: decryptData(credential.username, parentId) || '***',
+                password: '••••••••',
+                url: credential.url ? decryptData(credential.url, parentId) : null,
+                notes: credential.notes ? decryptData(credential.notes, parentId) : null,
+                category: credential.category,
+                isActive: credential.isActive,
+                iconUrl: credential.iconUrl || null,
+                tags: credential.tags || [],
+                additionalFields: Object.keys(additional).length ? additional : undefined,
+                securityLevel: credential.securityLevel || 'medium',
+                createdAt: credential.createdAt,
+                updatedAt: credential.updatedAt
+            };
+        });
 
         // Get total count for pagination
         const totalCredentials = await Credential.countDocuments(filter);
@@ -205,10 +218,10 @@ const getCredential = async (req, res, next) => {
         const decryptedCredential = {
             id: credential._id,
             title: credential.title,
-            username: decryptData(credential.username),
-            password: decryptData(credential.password),
-            url: credential.url ? decryptData(credential.url) : null,
-            notes: credential.notes ? decryptData(credential.notes) : null,
+            username: decryptData(credential.username, parentId),
+            password: decryptData(credential.password, parentId),
+            url: credential.url ? decryptData(credential.url, parentId) : null,
+            notes: credential.notes ? decryptData(credential.notes, parentId) : null,
             category: credential.category,
             isActive: credential.isActive,
             createdAt: credential.createdAt,
@@ -228,14 +241,14 @@ const updateCredential = async (req, res, next) => {
     try {
         const parentId = req.body.user._id;
         const { credentialId } = req.params;
-        const { 
-            title, 
-            username, 
-            password, 
-            url, 
-            notes, 
+        const {
+            title,
+            username,
+            password,
+            url,
+            notes,
             category,
-            isActive 
+            isActive
         } = req.body;
 
         if (!credentialId) {
@@ -254,12 +267,23 @@ const updateCredential = async (req, res, next) => {
         // Build update object
         const updateData = {};
         if (title !== undefined) updateData.title = title.trim();
-        if (username !== undefined) updateData.username = encryptData(username);
-        if (password !== undefined) updateData.password = encryptData(password);
-        if (url !== undefined) updateData.url = url ? encryptData(url) : null;
-        if (notes !== undefined) updateData.notes = notes ? encryptData(notes) : null;
+        if (username !== undefined) updateData.username = encryptData(username, parentId);
+        if (password !== undefined) updateData.password = encryptData(password, parentId);
+        if (url !== undefined) updateData.url = url ? encryptData(url, parentId) : null;
+        if (notes !== undefined) updateData.notes = notes ? encryptData(notes, parentId) : null;
         if (category !== undefined) updateData.category = category;
         if (isActive !== undefined) updateData.isActive = isActive;
+        if (req.body.iconUrl !== undefined) updateData.iconUrl = req.body.iconUrl || null;
+        if (req.body.tags !== undefined) updateData.tags = Array.isArray(req.body.tags) ? req.body.tags.slice(0, 50) : [];
+        if (req.body.securityLevel !== undefined) updateData.securityLevel = req.body.securityLevel;
+        if (req.body.additionalFields !== undefined) {
+            const encryptedAdditional = {};
+            const af = req.body.additionalFields || {};
+            for (const [k, v] of Object.entries(af)) {
+                encryptedAdditional[k] = encryptData(String(v), parentId);
+            }
+            updateData.additionalFields = encryptedAdditional;
+        }
 
         updateData.updatedAt = new Date();
 
@@ -325,10 +349,10 @@ const unlockVault = async (req, res, next) => {
         // In a real implementation, you would verify the master password
         // against a stored hash. For now, we'll use a simple check
         // In production, this should be stored securely and verified properly
-        
+
         // For demo purposes, we'll accept any password
         // In production, implement proper master password verification
-        
+
         return res.status(200).json(
             new ApiResponse(200, "Vault unlocked successfully", {
                 unlocked: true,
@@ -359,10 +383,10 @@ const changeMasterPassword = async (req, res, next) => {
         // 2. Hash the new master password
         // 3. Update the stored master password hash
         // 4. Re-encrypt all credentials with the new key
-        
+
         // For demo purposes, we'll just return success
         // In production, implement proper password change logic
-        
+
         return res.status(200).json(
             new ApiResponse(200, "Master password changed successfully")
         );

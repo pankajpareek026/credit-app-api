@@ -31,6 +31,28 @@ const credentialSchema = new mongoose.Schema({
         trim: true,
         maxlength: 1000
     },
+    // Optional metadata
+    iconUrl: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+        default: null
+    },
+    tags: {
+        type: [String],
+        default: []
+    },
+    // Additional fields as encrypted key->value map
+    additionalFields: {
+        type: Map,
+        of: String,
+        default: undefined
+    },
+    securityLevel: {
+        type: String,
+        enum: ['low', 'medium', 'high', 'critical'],
+        default: 'medium'
+    },
     category: {
         type: String,
         default: 'general',

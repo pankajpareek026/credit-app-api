@@ -13,6 +13,7 @@ const {
     validatePasswordStrength,
     validateStringLength
 } = require('../utils/validationUtils.js');
+const { setDefaultFeatureFlags, getUserFeatureFlags } = require('../middlewares/featureFlag.middleware');
 
 
 
@@ -275,7 +276,6 @@ const profile = async (req, res, next) => {
         console.log("🔍 User Profile - Name: " + name + ", Email: " + email)
 
         // console.log(`req recived  name=>${name} , _ID=>${_id} `)
-        const { name } = await user.findOne({ _id })
         const allClients = await clients.find({ parentId: _id }, { transactions: 0, parentId: 0 });
         let allSharedLinks = await share.find({ parentId: _id })
 
@@ -285,13 +285,13 @@ const profile = async (req, res, next) => {
                 isActive: currentTime < expireTime,
                 clientName, shareToken
             }
+
         })
 
         console.log("🔍 User Profile - Name=>", name)
         console.log("🔍 User Profile - Email=>", email)
         console.log("🔍 User Profile - all shared links =>", allSharedLinks)
 
-        })
         console.log("Name=>", name)
         console.log("all shared links =>", allSharedLinks)
         return res.status(200).json(
@@ -384,7 +384,7 @@ const resetPin = async (req, res, next) => {
         // Update user's PIN (assuming you have a PIN field in user model)
         // For now, we'll store it in a separate field or use a different approach
         // You might want to store PIN in a separate vault collection
-        
+
         return res.status(200).json(
             ApiResponse.success(null, "PIN reset successfully")
         );
@@ -395,11 +395,239 @@ const resetPin = async (req, res, next) => {
     }
 };
 
+// Admin Management Functions
+
+// Promote user to admin
+const promoteToAdmin = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { adminRole = 'admin', featureFlags } = req.body;
+        const currentUser = req.body.user;
+
+        // Check if current user can manage users
+        if (!currentUser.featureFlags?.canManageUsers) {
+            return next(ApiError.authorizationError('Insufficient permissions to promote users'));
+        }
+
+        // Find the user to promote
+        const userToPromote = await user.findById(userId);
+        if (!userToPromote) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        // Set default feature flags based on role
+        const defaultFlags = setDefaultFeatureFlags(userToPromote, adminRole);
+        const finalFlags = featureFlags ? { ...defaultFlags, ...featureFlags } : defaultFlags;
+
+        // Update user with admin privileges
+        const updatedUser = await user.findByIdAndUpdate(
+            userId,
+            {
+                isAdmin: true,
+                adminRole: adminRole,
+                featureFlags: finalFlags,
+                'adminMetadata.permissionsGrantedAt': new Date(),
+                'adminMetadata.createdBy': currentUser._id
+            },
+            { new: true }
+        ).select('-pass -token');
+
+        return res.status(200).json(
+            ApiResponse.success({
+                user: updatedUser,
+                featureFlags: getUserFeatureFlags(updatedUser)
+            }, 'User promoted to admin successfully')
+        );
+
+    } catch (error) {
+        console.error('Promote to admin error:', error);
+        return next(ApiError.internalError('Failed to promote user to admin'));
+    }
+};
+
+// Demote admin to regular user
+const demoteFromAdmin = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const currentUser = req.body.user;
+
+        // Check if current user can manage users
+        if (!currentUser.featureFlags?.canManageUsers) {
+            return next(ApiError.authorizationError('Insufficient permissions to demote users'));
+        }
+
+        // Prevent self-demotion
+        if (userId === currentUser._id.toString()) {
+            return next(ApiError.validationError([{
+                field: 'userId',
+                message: 'Cannot demote yourself',
+                value: userId
+            }]));
+        }
+
+        // Find the user to demote
+        const userToDemote = await user.findById(userId);
+        if (!userToDemote) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        // Reset to regular user
+        const updatedUser = await user.findByIdAndUpdate(
+            userId,
+            {
+                isAdmin: false,
+                adminRole: 'user',
+                featureFlags: setDefaultFeatureFlags(userToDemote, 'user'),
+                'adminMetadata.permissionsGrantedAt': null,
+                'adminMetadata.createdBy': null
+            },
+            { new: true }
+        ).select('-pass -token');
+
+        return res.status(200).json(
+            ApiResponse.success({
+                user: updatedUser,
+                featureFlags: getUserFeatureFlags(updatedUser)
+            }, 'User demoted from admin successfully')
+        );
+
+    } catch (error) {
+        console.error('Demote from admin error:', error);
+        return next(ApiError.internalError('Failed to demote user from admin'));
+    }
+};
+
+// Update user feature flags
+const updateFeatureFlags = async (req, res, next) => {
+    try {
+        const { userId } = req.params;
+        const { featureFlags } = req.body;
+        const currentUser = req.body.user;
+
+        // Check if current user can manage users
+        if (!currentUser.featureFlags?.canManageUsers) {
+            return next(ApiError.authorizationError('Insufficient permissions to update feature flags'));
+        }
+
+        // Find the user to update
+        const userToUpdate = await user.findById(userId);
+        if (!userToUpdate) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        // Update feature flags
+        const updatedUser = await user.findByIdAndUpdate(
+            userId,
+            { featureFlags: { ...userToUpdate.featureFlags, ...featureFlags } },
+            { new: true }
+        ).select('-pass -token');
+
+        return res.status(200).json(
+            ApiResponse.success({
+                user: updatedUser,
+                featureFlags: getUserFeatureFlags(updatedUser)
+            }, 'Feature flags updated successfully')
+        );
+
+    } catch (error) {
+        console.error('Update feature flags error:', error);
+        return next(ApiError.internalError('Failed to update feature flags'));
+    }
+};
+
+// Get user feature flags
+const getUserFlags = async (req, res, next) => {
+    try {
+        const currentUser = req.body.user;
+
+        const featureFlags = getUserFeatureFlags(currentUser);
+
+        return res.status(200).json(
+            ApiResponse.success(featureFlags, 'User feature flags retrieved successfully')
+        );
+
+    } catch (error) {
+        console.error('Get user flags error:', error);
+        return next(ApiError.internalError('Failed to retrieve user feature flags'));
+    }
+};
+
+// Get all admin users
+const getAllAdminUsers = async (req, res, next) => {
+    try {
+        const currentUser = req.body.user;
+
+        // Check if current user can manage users
+        if (!currentUser.featureFlags?.canManageUsers) {
+            return next(ApiError.authorizationError('Insufficient permissions to view admin users'));
+        }
+
+        const { page = 1, limit = 20, search, role } = req.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Build query
+        let query = { isAdmin: true };
+
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (role) {
+            query.adminRole = role;
+        }
+
+        // Get admin users with pagination
+        const adminUsers = await user.find(query)
+            .select('-pass -token')
+            .populate('adminMetadata.createdBy', 'name email')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum);
+
+        // Get total count
+        const totalCount = await user.countDocuments(query);
+        const totalPages = Math.ceil(totalCount / limitNum);
+
+        const responseData = {
+            adminUsers: adminUsers.map(user => ({
+                ...user.toObject(),
+                featureFlags: getUserFeatureFlags(user)
+            })),
+            pagination: {
+                currentPage: pageNum,
+                totalPages,
+                totalCount,
+                itemsPerPage: limitNum,
+                hasNextPage: pageNum < totalPages,
+                hasPrevPage: pageNum > 1
+            }
+        };
+
+        return res.status(200).json(
+            ApiResponse.success(responseData, 'Admin users retrieved successfully')
+        );
+
+    } catch (error) {
+        console.error('Get all admin users error:', error);
+        return next(ApiError.internalError('Failed to retrieve admin users'));
+    }
+};
+
 module.exports = {
     register,
     login,
     profile,
     logout,
     verifyPasswordForPinReset,
-    resetPin
+    resetPin,
+    promoteToAdmin,
+    demoteFromAdmin,
+    updateFeatureFlags,
+    getUserFlags,
+    getAllAdminUsers
 };
