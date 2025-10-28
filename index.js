@@ -20,6 +20,8 @@ const vaultRouter = require('./routes/vault.route.js')
 const loginRecordRouter = require('./routes/loginRecord.route.js')
 const expenseRouter = require('./routes/expense.route.js')
 const goalRouter = require('./routes/goal.route.js')
+const routineRouter = require('./routes/routine.route.js')
+const taskRouter = require('./routes/task.route.js')
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.middleware.js')
@@ -48,6 +50,8 @@ app.use('/api/vault', vaultRouter)
 app.use('/api/login-records', loginRecordRouter)
 app.use('/api/expenses', expenseRouter)
 app.use('/api/goals', goalRouter)
+app.use('/api/routines', routineRouter)
+app.use('/api/tasks', taskRouter)
 
 // 404 handler for unmatched routes
 app.use(notFoundHandler)

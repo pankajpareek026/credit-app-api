@@ -1,12 +1,12 @@
 const {
-  createGoal,
-  getAllGoals,
-  getGoal,
-  updateGoal,
-  deleteGoal,
-  markGoalAsCompleted,
-  updateGoalProgress,
-  getGoalStatistics
+    createGoal,
+    getAllGoals,
+    getGoal,
+    updateGoal,
+    deleteGoal,
+    markGoalAsCompleted,
+    updateGoalProgress,
+    getGoalStatistics
 } = require('../controllers/goal.controller');
 const authy = require('../middlewares/auth.middleware');
 
