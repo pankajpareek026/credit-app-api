@@ -38,3 +38,12 @@ router.route("/:goalId/progress").patch(authy, updateGoalProgress);
 router.route("/statistics").get(authy, getGoalStatistics);
 
 module.exports = router;
+
+
+
+
+
+
+
+
+

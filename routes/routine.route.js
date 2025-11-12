@@ -37,3 +37,12 @@ router.get('/:routineId/progress', authMiddleware, getRoutineProgress);
 router.get('/statistics', authMiddleware, getRoutineStatistics);
 
 module.exports = router;
+
+
+
+
+
+
+
+
+

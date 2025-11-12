@@ -288,12 +288,7 @@ const profile = async (req, res, next) => {
 
         })
 
-        console.log("🔍 User Profile - Name=>", name)
-        console.log("🔍 User Profile - Email=>", email)
-        console.log("🔍 User Profile - all shared links =>", allSharedLinks)
-
-        console.log("Name=>", name)
-        console.log("all shared links =>", allSharedLinks)
+       
         return res.status(200).json(
             new ApiResponse(true, false, "success", {
                 name: name,
