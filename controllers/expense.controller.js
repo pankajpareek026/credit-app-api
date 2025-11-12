@@ -242,9 +242,13 @@ const getExpenseStatistics = async (req, res, next) => {
             ])
         ]);
 
+        // Calculate total income (for now set to 0, can be extended later with income tracking)
+        // TODO: If income tracking is added, calculate from income model/transactions
+        const totalIncome = 0;
+
         const statistics = {
-            totalExpenses,
-            totalAmount: totalAmount[0]?.total || 0,
+            totalExpenses: totalAmount[0]?.total || 0,
+            totalIncome: totalIncome,
             averageAmount: totalExpenses > 0 ? (totalAmount[0]?.total || 0) / totalExpenses : 0,
             categoryBreakdown: categoryStats,
             paymentMethodBreakdown: paymentMethodStats,

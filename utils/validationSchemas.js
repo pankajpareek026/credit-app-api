@@ -1265,6 +1265,210 @@ const expenseSchemas = {
 };
 
 /**
+ * Budget Validation Schemas
+ */
+const budgetSchemas = {
+    // Create budget schema
+    create: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .required()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters',
+                'any.required': 'Title is required'
+            }),
+        allocatedAmount: Joi.number()
+            .positive()
+            .required()
+            .messages({
+                'number.base': 'Allocated amount must be a valid number',
+                'number.positive': 'Allocated amount must be positive',
+                'any.required': 'Allocated amount is required'
+            }),
+        spentAmount: Joi.number()
+            .min(0)
+            .default(0)
+            .optional()
+            .messages({
+                'number.base': 'Spent amount must be a valid number',
+                'number.min': 'Spent amount cannot be negative'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .default('OTHER')
+            .required()
+            .messages({
+                'any.only': 'Category must be one of the allowed values',
+                'any.required': 'Category is required'
+            }),
+        period: Joi.string()
+            .valid('MONTHLY', 'QUARTERLY', 'YEARLY', 'CUSTOM')
+            .default('MONTHLY')
+            .required()
+            .messages({
+                'any.only': 'Period must be one of the allowed values',
+                'any.required': 'Period is required'
+            }),
+        startDate: Joi.date()
+            .required()
+            .messages({
+                'date.base': 'Start date must be a valid date',
+                'any.required': 'Start date is required'
+            }),
+        endDate: Joi.date()
+            .greater(Joi.ref('startDate'))
+            .required()
+            .messages({
+                'date.base': 'End date must be a valid date',
+                'date.greater': 'End date must be after start date',
+                'any.required': 'End date is required'
+            }),
+        isActive: Joi.boolean()
+            .default(true)
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Update budget schema
+    update: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters'
+            }),
+        allocatedAmount: Joi.number()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Allocated amount must be a valid number',
+                'number.positive': 'Allocated amount must be positive'
+            }),
+        spentAmount: Joi.number()
+            .min(0)
+            .optional()
+            .messages({
+                'number.base': 'Spent amount must be a valid number',
+                'number.min': 'Spent amount cannot be negative'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        period: Joi.string()
+            .valid('MONTHLY', 'QUARTERLY', 'YEARLY', 'CUSTOM')
+            .optional()
+            .messages({
+                'any.only': 'Period must be one of the allowed values'
+            }),
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Get budgets with filters schema
+    getBudgets: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .default(1)
+            .messages({
+                'number.base': 'Page must be a number',
+                'number.integer': 'Page must be an integer',
+                'number.min': 'Page must be at least 1'
+            }),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .default(20)
+            .messages({
+                'number.base': 'Limit must be a number',
+                'number.integer': 'Limit must be an integer',
+                'number.min': 'Limit must be at least 1',
+                'number.max': 'Limit must not exceed 100'
+            }),
+        search: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Search term must be at least 1 character long',
+                'string.max': 'Search term must not exceed 100 characters'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            }),
+        period: Joi.string()
+            .valid('MONTHLY', 'QUARTERLY', 'YEARLY', 'CUSTOM')
+            .optional()
+            .messages({
+                'any.only': 'Period must be one of the allowed values'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            }),
+        sortBy: Joi.string()
+            .valid('createdAt', 'startDate', 'endDate', 'allocatedAmount', 'title')
+            .default('createdAt')
+            .messages({
+                'any.only': 'sortBy must be one of the allowed values'
+            }),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .default('desc')
+            .messages({
+                'any.only': 'sortOrder must be either asc or desc'
+            })
+    }),
+
+    // Get budget statistics schema
+    getStatistics: Joi.object({
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            }),
+        category: Joi.string()
+            .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Category must be one of the allowed values'
+            })
+    })
+};
+
+/**
  * Tasks Validation Schemas
  */
 const tasksSchemas = {
@@ -1358,5 +1562,6 @@ module.exports = {
     billReminderSchemas,
     vaultSchemas,
     expenseSchemas,
+    budgetSchemas,
     tasksSchemas
 }; 
