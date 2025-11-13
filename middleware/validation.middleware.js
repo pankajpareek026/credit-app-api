@@ -11,6 +11,10 @@ const validateRequest = (schema, source = 'body') => {
     return (req, res, next) => {
         try {
             const data = req[source];
+            
+            // Preserve user object if validating body (added by auth middleware)
+            const preservedUser = source === 'body' ? req.body?.user : null;
+            
             const { error, value } = schema.validate(data, {
                 abortEarly: false,
                 stripUnknown: true,
@@ -29,6 +33,12 @@ const validateRequest = (schema, source = 'body') => {
 
             // Replace the request data with validated data
             req[source] = value;
+            
+            // Restore preserved user object if validating body
+            if (source === 'body' && preservedUser) {
+                req.body.user = preservedUser;
+            }
+            
             next();
         } catch (error) {
             return next(new ApiError(500, "Validation middleware error"));

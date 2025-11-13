@@ -7,10 +7,8 @@ const ApiResponse = require('../utils/apiResponse.utils');
  */
 const createExpense = async (req, res, next) => {
     try {
-        // Get parentId from user (added by auth middleware)
-        // Note: req.body.user might be preserved or removed by validation middleware
-        // So we check both req.body.user and a preserved reference
-        const parentId = req.body.user?._id || req.user?._id;
+        // Get parentId from user (added by auth middleware, preserved by validation middleware)
+        const { _id: parentId } = req.body.user;
 
         if (!parentId) {
             return next(new ApiError(400, 'User ID not found in request'));
