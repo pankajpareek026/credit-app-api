@@ -7,16 +7,75 @@ const ApiResponse = require('../utils/apiResponse.utils');
  */
 const createExpense = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
-        const expenseData = { ...req.body, parentId };
+        // Get parentId from user (added by auth middleware)
+        // Note: req.body.user might be preserved or removed by validation middleware
+        // So we check both req.body.user and a preserved reference
+        const parentId = req.body.user?._id || req.user?._id;
+
+        if (!parentId) {
+            return next(new ApiError(400, 'User ID not found in request'));
+        }
+
+        // Extract only the expense fields from req.body (exclude user object and any other unknown fields)
+        // Validation middleware should have already validated and stripped unknown fields
+        const {
+            title,
+            amount,
+            date,
+            category,
+            paymentMethod,
+            tags,
+            notes,
+            isActive
+        } = req.body;
+
+        // Validate required fields are present (should already be validated by middleware, but double-check)
+        if (!title || amount === undefined || !date || !category || !paymentMethod) {
+            return next(ApiError.validationError([{
+                field: 'required_fields',
+                message: 'Missing required fields: title, amount, date, category, paymentMethod'
+            }]));
+        }
+
+        // Build expense data object with only valid fields
+        const expenseData = {
+            parentId,
+            title: title.trim(),
+            amount: parseFloat(amount),
+            date: new Date(date),
+            category: category.toUpperCase(),
+            paymentMethod: paymentMethod.toUpperCase(),
+            tags: Array.isArray(tags) ? tags.filter(tag => tag && tag.trim()).map(tag => tag.trim()) : [],
+            isActive: isActive !== undefined ? Boolean(isActive) : true
+        };
+
+        // Only include notes if it's provided and not empty
+        if (notes && notes.trim()) {
+            expenseData.notes = notes.trim();
+        }
 
         const newExpense = await expense.create(expenseData);
-        
+
         return res.status(201).json(
             ApiResponse.created(newExpense, "Expense created successfully")
         );
     } catch (error) {
         console.error('Create expense error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+
+        // Check if it's a validation error from Mongoose
+        if (error.name === 'ValidationError') {
+            const validationErrors = Object.values(error.errors || {}).map(err => ({
+                field: err.path,
+                message: err.message
+            }));
+            return next(ApiError.validationError(validationErrors));
+        }
+
         return next(ApiError.internalError('Failed to create expense'));
     }
 };
