@@ -704,9 +704,13 @@ const getTransactionStatistics = async (req, res, next) => {
             debitAmount: 0
         };
 
-        return res.status(200).json(
-            new ApiResponse(true, false, "Transaction statistics retrieved successfully", responseData)
-        );
+        // Remove _id from responseData if it exists
+        if (responseData._id !== undefined) {
+            delete responseData._id;
+        }
+
+        const apiResponse = new ApiResponse(true, false, "Transaction statistics retrieved successfully", responseData);
+        return res.status(200).json(apiResponse);
 
     } catch (error) {
         console.error("Error in getTransactionStatistics:", error.message);
