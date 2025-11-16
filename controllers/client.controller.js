@@ -29,22 +29,47 @@ const newClient = async (req, res, next) => {
         }
 
         const parentId = req.body.user._id;
+        // Normalize parentId: Convert to String (model expects String type)
+        const parentIdString = String(parentId);
         const { name, phoneNumber, email, notes } = value;
 
-
         // Check if client with same name already exists for this user
+        // Handle both String and ObjectId formats for backward compatibility
+        let parentIdObjectId = null;
+        if (mongoose.Types.ObjectId.isValid(parentId)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentId);
+            } catch (e) {
+                console.warn("Could not convert parentId to ObjectId:", e.message);
+            }
+        }
+
+        // Build parentId match condition
+        const parentIdMatch = parentIdObjectId 
+            ? { $or: [{ parentId: parentIdString }, { parentId: parentIdObjectId }] }
+            : { parentId: parentIdString };
+
         const existingClient = await clients.findOne({
-            parentId,
-            name: { $regex: new RegExp(`^${name}$`, 'i') },
-            isActive: true
+            $and: [
+                parentIdMatch,
+                {
+                    name: { $regex: new RegExp(`^${name}$`, 'i') }
+                },
+                {
+                    $or: [
+                        { isActive: true },
+                        { isActive: { $exists: false } }
+                    ]
+                }
+            ]
         });
 
         if (existingClient) {
             return next(ApiError.conflictError("Client with this name already exists"));
         }
 
-        // Create a new client with provided data
-        const clientData = { parentId, name };
+        // Create a new client with provided data - ensure parentId is stored as String
+        const clientData = { parentId: parentIdString, name };
         if (phoneNumber) clientData.phoneNumber = phoneNumber;
         if (email) clientData.email = email;
         if (notes) clientData.notes = notes;
@@ -99,6 +124,16 @@ const editClient = async (req, res, next) => {
 
         const { clientId, newName, currentName } = value;
         const { _id: parentId } = req.body.user;
+        // Normalize parentId: Convert to String (model expects String type)
+        const parentIdString = String(parentId);
+        let parentIdObjectId = null;
+        if (mongoose.Types.ObjectId.isValid(parentId)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentId);
+            } catch (e) {
+                console.warn("Could not convert parentId to ObjectId:", e.message);
+            }
+        }
 
         // Validate ObjectId
         if (!mongoose.Types.ObjectId.isValid(clientId)) {
@@ -109,34 +144,63 @@ const editClient = async (req, res, next) => {
             }]));
         }
 
-        // Check if client exists
+        // Build parentId match condition - reusable for multiple queries
+        const parentIdMatch = parentIdObjectId 
+            ? { $or: [{ parentId: parentIdString }, { parentId: parentIdObjectId }] }
+            : { parentId: parentIdString };
+
+        // Check if client exists - handle both String and ObjectId formats
         const existingClient = await clients.findOne({
-            parentId,
-            _id: mongoose.Types.ObjectId(clientId),
-            isActive: true
+            $and: [
+                parentIdMatch,
+                {
+                    _id: mongoose.Types.ObjectId(clientId)
+                },
+                {
+                    $or: [
+                        { isActive: true },
+                        { isActive: { $exists: false } }
+                    ]
+                }
+            ]
         });
 
         if (!existingClient) {
             return next(ApiError.notFoundError("Client not found"));
         }
 
-        // Check if new name already exists for another client
+        // Check if new name already exists for another client - handle both String and ObjectId formats
         const nameExists = await clients.findOne({
-            parentId,
-            name: { $regex: new RegExp(`^${newName}$`, 'i') },
-            _id: { $ne: mongoose.Types.ObjectId(clientId) },
-            isActive: true
+            $and: [
+                parentIdMatch,
+                {
+                    name: { $regex: new RegExp(`^${newName}$`, 'i') }
+                },
+                {
+                    _id: { $ne: mongoose.Types.ObjectId(clientId) }
+                },
+                {
+                    $or: [
+                        { isActive: true },
+                        { isActive: { $exists: false } }
+                    ]
+                }
+            ]
         });
 
         if (nameExists) {
             return next(ApiError.conflictError("Client with this name already exists"));
         }
 
-        // Update client name
+        // Update client name - handle both String and ObjectId formats
         const result = await clients.findOneAndUpdate(
             {
-                parentId,
-                _id: mongoose.Types.ObjectId(clientId)
+                $and: [
+                    parentIdMatch,
+                    {
+                        _id: mongoose.Types.ObjectId(clientId)
+                    }
+                ]
             },
             { name: newName },
             { new: true }
@@ -166,6 +230,21 @@ const allClients = async (req, res, next) => {
             return next(ApiError.authenticationError("Unauthorized user"));
         }
 
+        // Normalize parentId: Convert to String (model expects String type)
+        // For backward compatibility, also prepare ObjectId format in case old data exists
+        const parentIdString = String(parentId);
+        let parentIdObjectId = null;
+        
+        // Only create ObjectId if parentId is a valid ObjectId format
+        if (mongoose.Types.ObjectId.isValid(parentId)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentId);
+            } catch (e) {
+                // If conversion fails, parentIdObjectId remains null
+                console.warn("Could not convert parentId to ObjectId:", e.message);
+            }
+        }
+
         // Validate pagination parameters if provided
         const { page = 1, limit = 50, sortBy = 'balance', sortOrder = 'asc' } = req.query;
 
@@ -182,19 +261,30 @@ const allClients = async (req, res, next) => {
 
         const skip = (pageNum - 1) * limitNum;
 
+        // Build match condition for parentId - handle both String and ObjectId formats
+        const parentIdMatch = parentIdObjectId 
+            ? { $or: [{ parentId: parentIdString }, { parentId: parentIdObjectId }] }
+            : { parentId: parentIdString };
 
-        // Debug: Check total clients in database
-        const totalClientsInDB = await clients.countDocuments({});
-        const totalActiveClientsInDB = await clients.countDocuments({ isActive: true });
-        const clientsForThisUser = await clients.countDocuments({ parentId, isActive: true });
+        // Build match condition for isActive - include old data without isActive field
+        const isActiveMatch = {
+            $or: [
+                { isActive: true },
+                { isActive: { $exists: false } } // Include clients without isActive field (old data)
+            ]
+        };
 
+        // Combine both conditions
+        const matchCondition = {
+            $and: [
+                parentIdMatch,
+                isActiveMatch
+            ]
+        };
 
         let result = await clients.aggregate([
             {
-                $match: {
-                    parentId,
-                    isActive: true
-                },
+                $match: matchCondition
             },
             {
                 $lookup: {
@@ -286,6 +376,16 @@ const allClients = async (req, res, next) => {
 const deleteClient = async (req, res, next) => {
     try {
         const { _id: parentId } = req.body.user;
+        // Normalize parentId: Convert to String (model expects String type)
+        const parentIdString = String(parentId);
+        let parentIdObjectId = null;
+        if (mongoose.Types.ObjectId.isValid(parentId)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentId);
+            } catch (e) {
+                console.warn("Could not convert parentId to ObjectId:", e.message);
+            }
+        }
         const { clientid: clientId, clientname } = req.headers;
 
         if (!parentId) {
@@ -309,22 +409,40 @@ const deleteClient = async (req, res, next) => {
             }]));
         }
 
-        // Check if client exists
+        // Build parentId match condition
+        const parentIdMatch = parentIdObjectId 
+            ? { $or: [{ parentId: parentIdString }, { parentId: parentIdObjectId }] }
+            : { parentId: parentIdString };
+
+        // Check if client exists - handle both String and ObjectId formats
         const existingClient = await clients.findOne({
-            parentId,
-            _id: mongoose.Types.ObjectId(clientId),
-            isActive: true
+            $and: [
+                parentIdMatch,
+                {
+                    _id: mongoose.Types.ObjectId(clientId)
+                },
+                {
+                    $or: [
+                        { isActive: true },
+                        { isActive: { $exists: false } }
+                    ]
+                }
+            ]
         });
 
         if (!existingClient) {
             return next(ApiError.notFoundError("Client not found"));
         }
 
-        // Soft delete client (set isActive to false instead of hard delete)
+        // Soft delete client (set isActive to false instead of hard delete) - handle both String and ObjectId formats
         const deleteResult = await clients.findOneAndUpdate(
             {
-                parentId,
-                _id: mongoose.Types.ObjectId(clientId)
+                $and: [
+                    parentIdMatch,
+                    {
+                        _id: mongoose.Types.ObjectId(clientId)
+                    }
+                ]
             },
             {
                 isActive: false,
@@ -384,13 +502,41 @@ const searchClient = async (req, res, next) => {
             }]));
         }
 
+        // Normalize parentId: Convert to String (model expects String type)
+        const parentIdString = String(parentId);
+        let parentIdObjectId = null;
+        if (mongoose.Types.ObjectId.isValid(parentId)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentId);
+            } catch (e) {
+                console.warn("Could not convert parentId to ObjectId:", e.message);
+            }
+        }
+
+        // Build parentId match condition
+        const parentIdMatch = parentIdObjectId 
+            ? { $or: [{ parentId: parentIdString }, { parentId: parentIdObjectId }] }
+            : { parentId: parentIdString };
+
+        // Build isActive match condition
+        const isActiveMatch = {
+            $or: [
+                { isActive: true },
+                { isActive: { $exists: false } } // Include clients without isActive field (old data)
+            ]
+        };
+
         // Aggregation to search user and calculate balance
         let result = await clients.aggregate([
             {
                 "$match": {
-                    "parentId": parentId,
-                    "isActive": true,
-                    "name": { "$regex": sanitizedQuery, "$options": "i" }
+                    $and: [
+                        parentIdMatch,
+                        isActiveMatch,
+                        {
+                            "name": { "$regex": sanitizedQuery, "$options": "i" }
+                        }
+                    ]
                 }
             },
             {
