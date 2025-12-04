@@ -24,6 +24,7 @@ const budgetRouter = require('./routes/budget.route.js')
 const goalRouter = require('./routes/goal.route.js')
 const routineRouter = require('./routes/routine.route.js')
 const taskRouter = require('./routes/task.route.js')
+const portfolioRouter = require('./routes/portfolio.route.js')
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.middleware.js')
@@ -56,6 +57,7 @@ app.use('/api/budgets', budgetRouter)
 app.use('/api/goals', goalRouter)
 app.use('/api/routines', routineRouter)
 app.use('/api/tasks', taskRouter)
+app.use('/api/portfolio', portfolioRouter)
 
 // 404 handler for unmatched routes
 app.use(notFoundHandler)

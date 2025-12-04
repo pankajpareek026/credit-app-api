@@ -49,6 +49,24 @@ class ApiError extends Error {
     }
 
     /**
+     * Create unauthorized error
+     * @param {string} message - Error message
+     * @returns {ApiError} Unauthorized error instance
+     */
+    static unauthorizedError(message = "Unauthorized") {
+        return new ApiError(401, message, [], true)
+    }
+
+    /**
+     * Create bad request error
+     * @param {string} message - Error message
+     * @returns {ApiError} Bad request error instance
+     */
+    static badRequestError(message = "Bad request") {
+        return new ApiError(400, message, [], true)
+    }
+
+    /**
      * Create not found error
      * @param {string} message - Error message
      * @returns {ApiError} Not found error instance

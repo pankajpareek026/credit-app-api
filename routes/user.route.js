@@ -11,6 +11,12 @@ const {
     getUserFlags,
     getAllAdminUsers
 } = require('../controllers/user.controller');
+const {
+    requestOtp,
+    verifyOtpForLogin,
+    verifyOtpForPasswordReset,
+    resetPassword
+} = require('../controllers/otp.controller');
 const authy = require('../middlewares/auth.middleware');
 const { featureFlagMiddleware, adminRoleMiddleware } = require('../middlewares/featureFlag.middleware');
 
@@ -20,6 +26,12 @@ router.route("/login").post(login)
 router.route("/register").post(register)
 router.route("/logout").post(authy, logout)
 router.route("/userProfile").get(authy, profile)
+
+// OTP routes
+router.route("/request-otp").post(requestOtp)
+router.route("/verify-otp-login").post(verifyOtpForLogin)
+router.route("/verify-otp-password-reset").post(verifyOtpForPasswordReset)
+router.route("/reset-password").post(resetPassword)
 
 // PIN reset routes
 router.route("/verify-password-for-pin-reset").post(verifyPasswordForPinReset)

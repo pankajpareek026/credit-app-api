@@ -1553,6 +1553,359 @@ const tasksSchemas = {
     })
 };
 
+/**
+ * OTP Validation Schemas
+ */
+const otpSchemas = {
+    // Request OTP schema
+    requestOtp: Joi.object({
+        email: Joi.string()
+            .email()
+            .required()
+            .messages({
+                'string.email': 'Please enter a valid email address',
+                'any.required': 'Email is required'
+            }),
+        purpose: Joi.string()
+            .valid('login', 'password_reset')
+            .required()
+            .messages({
+                'any.only': 'Purpose must be either "login" or "password_reset"',
+                'any.required': 'Purpose is required'
+            })
+    }),
+
+    // Verify OTP schema
+    verifyOtp: Joi.object({
+        email: Joi.string()
+            .email()
+            .required()
+            .messages({
+                'string.email': 'Please enter a valid email address',
+                'any.required': 'Email is required'
+            }),
+        otp: Joi.string()
+            .length(6)
+            .pattern(/^\d+$/)
+            .required()
+            .messages({
+                'string.length': 'OTP must be exactly 6 digits',
+                'string.pattern.base': 'OTP must contain only numbers',
+                'any.required': 'OTP is required'
+            }),
+        purpose: Joi.string()
+            .valid('login', 'password_reset')
+            .required()
+            .messages({
+                'any.only': 'Purpose must be either "login" or "password_reset"',
+                'any.required': 'Purpose is required'
+            })
+    }),
+
+    // Reset password schema
+    resetPassword: Joi.object({
+        email: Joi.string()
+            .email()
+            .required()
+            .messages({
+                'string.email': 'Please enter a valid email address',
+                'any.required': 'Email is required'
+            }),
+        otp: Joi.string()
+            .length(6)
+            .pattern(/^\d+$/)
+            .required()
+            .messages({
+                'string.length': 'OTP must be exactly 6 digits',
+                'string.pattern.base': 'OTP must contain only numbers',
+                'any.required': 'OTP is required'
+            }),
+        newPassword: Joi.string()
+            .min(8)
+            .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+            .required()
+            .messages({
+                'string.min': 'Password must be at least 8 characters long',
+                'string.pattern.base': 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+                'any.required': 'New password is required'
+            })
+    })
+};
+
+/**
+ * Portfolio Validation Schemas
+ */
+const portfolioSchemas = {
+    // Create asset schema
+    createAsset: Joi.object({
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .required()
+            .messages({
+                'any.only': 'Asset type must be CRYPTO, STOCK, or MUTUAL_FUND',
+                'any.required': 'Asset type is required'
+            }),
+        symbol: Joi.string()
+            .trim()
+            .max(50)
+            .required()
+            .messages({
+                'string.max': 'Symbol must not exceed 50 characters',
+                'any.required': 'Symbol is required'
+            }),
+        name: Joi.string()
+            .trim()
+            .max(200)
+            .required()
+            .messages({
+                'string.max': 'Name must not exceed 200 characters',
+                'any.required': 'Name is required'
+            }),
+        quantity: Joi.number()
+            .min(0)
+            .required()
+            .messages({
+                'number.min': 'Quantity must be greater than or equal to 0',
+                'any.required': 'Quantity is required'
+            }),
+        averageBuyPrice: Joi.number()
+            .min(0)
+            .required()
+            .messages({
+                'number.min': 'Average buy price must be greater than or equal to 0',
+                'any.required': 'Average buy price is required'
+            }),
+        currentPrice: Joi.number()
+            .min(0)
+            .optional()
+            .messages({
+                'number.min': 'Current price must be greater than or equal to 0'
+            }),
+        exchange: Joi.string()
+            .trim()
+            .max(50)
+            .optional()
+            .messages({
+                'string.max': 'Exchange must not exceed 50 characters'
+            }),
+        notes: Joi.string()
+            .trim()
+            .max(500)
+            .optional()
+            .messages({
+                'string.max': 'Notes must not exceed 500 characters'
+            })
+    }),
+
+    // Update asset schema
+    updateAsset: Joi.object({
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .optional(),
+        symbol: Joi.string()
+            .trim()
+            .max(50)
+            .optional(),
+        name: Joi.string()
+            .trim()
+            .max(200)
+            .optional(),
+        quantity: Joi.number()
+            .min(0)
+            .optional(),
+        averageBuyPrice: Joi.number()
+            .min(0)
+            .optional(),
+        currentPrice: Joi.number()
+            .min(0)
+            .optional(),
+        exchange: Joi.string()
+            .trim()
+            .max(50)
+            .optional(),
+        notes: Joi.string()
+            .trim()
+            .max(500)
+            .optional(),
+        isActive: Joi.boolean()
+            .optional()
+    }),
+
+    // Create transaction schema
+    createTransaction: Joi.object({
+        assetId: Joi.string()
+            .required()
+            .messages({
+                'any.required': 'Asset ID is required'
+            }),
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .required()
+            .messages({
+                'any.only': 'Asset type must be CRYPTO, STOCK, or MUTUAL_FUND',
+                'any.required': 'Asset type is required'
+            }),
+        transactionType: Joi.string()
+            .valid('BUY', 'SELL', 'TRANSFER')
+            .required()
+            .messages({
+                'any.only': 'Transaction type must be BUY, SELL, or TRANSFER',
+                'any.required': 'Transaction type is required'
+            }),
+        quantity: Joi.number()
+            .min(0)
+            .required()
+            .messages({
+                'number.min': 'Quantity must be greater than or equal to 0',
+                'any.required': 'Quantity is required'
+            }),
+        price: Joi.number()
+            .min(0)
+            .required()
+            .messages({
+                'number.min': 'Price must be greater than or equal to 0',
+                'any.required': 'Price is required'
+            }),
+        fees: Joi.number()
+            .min(0)
+            .optional()
+            .default(0)
+            .messages({
+                'number.min': 'Fees must be greater than or equal to 0'
+            }),
+        date: Joi.date()
+            .required()
+            .messages({
+                'any.required': 'Date is required'
+            }),
+        exchange: Joi.string()
+            .trim()
+            .max(50)
+            .optional(),
+        notes: Joi.string()
+            .trim()
+            .max(500)
+            .optional()
+    }),
+
+    // Update transaction schema
+    updateTransaction: Joi.object({
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .optional(),
+        transactionType: Joi.string()
+            .valid('BUY', 'SELL', 'TRANSFER')
+            .optional(),
+        quantity: Joi.number()
+            .min(0)
+            .optional(),
+        price: Joi.number()
+            .min(0)
+            .optional(),
+        fees: Joi.number()
+            .min(0)
+            .optional(),
+        date: Joi.date()
+            .optional(),
+        exchange: Joi.string()
+            .trim()
+            .max(50)
+            .optional(),
+        notes: Joi.string()
+            .trim()
+            .max(500)
+            .optional()
+    }),
+
+    // Get assets schema (query)
+    getAssets: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .optional()
+            .default(1),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .optional()
+            .default(50),
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .optional(),
+        search: Joi.string()
+            .optional(),
+        isActive: Joi.boolean()
+            .optional()
+            .default(true),
+        sortBy: Joi.string()
+            .valid('createdAt', 'symbol', 'name', 'currentValue', 'profitLoss')
+            .optional()
+            .default('createdAt'),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .optional()
+            .default('desc')
+    }),
+
+    // Get transactions schema (query)
+    getTransactions: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .optional()
+            .default(1),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .optional()
+            .default(50),
+        assetId: Joi.string()
+            .optional(),
+        assetType: Joi.string()
+            .valid('CRYPTO', 'STOCK', 'MUTUAL_FUND')
+            .optional(),
+        transactionType: Joi.string()
+            .valid('BUY', 'SELL', 'TRANSFER')
+            .optional(),
+        startDate: Joi.date()
+            .optional(),
+        endDate: Joi.date()
+            .optional(),
+        sortBy: Joi.string()
+            .valid('date', 'quantity', 'price', 'totalAmount')
+            .optional()
+            .default('date'),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .optional()
+            .default('desc')
+    }),
+
+    // Get snapshots schema (query)
+    getSnapshots: Joi.object({
+        startDate: Joi.date()
+            .optional(),
+        endDate: Joi.date()
+            .optional(),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(1000)
+            .optional()
+            .default(365)
+    }),
+
+    // Get analytics schema (query)
+    getAnalytics: Joi.object({
+        startDate: Joi.date()
+            .optional(),
+        endDate: Joi.date()
+            .optional()
+    })
+};
+
 module.exports = {
     userSchemas,
     clientSchemas,
@@ -1563,5 +1916,7 @@ module.exports = {
     vaultSchemas,
     expenseSchemas,
     budgetSchemas,
-    tasksSchemas
+    tasksSchemas,
+    otpSchemas,
+    portfolioSchemas
 }; 
