@@ -1906,7 +1906,359 @@ const portfolioSchemas = {
     })
 };
 
+/**
+ * Budget Section Validation Schemas
+ */
+const budgetSectionSchemas = {
+    // Create budget section schema
+    create: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .required()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters',
+                'any.required': 'Title is required'
+            }),
+        description: Joi.string()
+            .max(500)
+            .allow('', null)
+            .optional()
+            .messages({
+                'string.max': 'Description must not exceed 500 characters'
+            }),
+        startDate: Joi.date()
+            .required()
+            .messages({
+                'date.base': 'Start date must be a valid date',
+                'any.required': 'Start date is required'
+            }),
+        endDate: Joi.date()
+            .greater(Joi.ref('startDate'))
+            .required()
+            .messages({
+                'date.base': 'End date must be a valid date',
+                'date.greater': 'End date must be after start date',
+                'any.required': 'End date is required'
+            }),
+        targetBudget: Joi.number()
+            .positive()
+            .allow(null)
+            .optional()
+            .messages({
+                'number.base': 'Target budget must be a valid number',
+                'number.positive': 'Target budget must be positive'
+            }),
+        isActive: Joi.boolean()
+            .default(true)
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Update budget section schema
+    update: Joi.object({
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters'
+            }),
+        description: Joi.string()
+            .max(500)
+            .allow('', null)
+            .optional()
+            .messages({
+                'string.max': 'Description must not exceed 500 characters'
+            }),
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            }),
+        targetBudget: Joi.number()
+            .positive()
+            .allow(null)
+            .optional()
+            .messages({
+                'number.base': 'Target budget must be a valid number',
+                'number.positive': 'Target budget must be positive'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Get budget sections with filters schema
+    getAll: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .default(1)
+            .messages({
+                'number.base': 'Page must be a number',
+                'number.integer': 'Page must be an integer',
+                'number.min': 'Page must be at least 1'
+            }),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .default(20)
+            .messages({
+                'number.base': 'Limit must be a number',
+                'number.integer': 'Limit must be an integer',
+                'number.min': 'Limit must be at least 1',
+                'number.max': 'Limit must not exceed 100'
+            }),
+        search: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Search term must be at least 1 character long',
+                'string.max': 'Search term must not exceed 100 characters'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            }),
+        sortBy: Joi.string()
+            .valid('createdAt', 'startDate', 'endDate', 'title')
+            .default('createdAt')
+            .messages({
+                'any.only': 'sortBy must be one of the allowed values'
+            }),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .default('desc')
+            .messages({
+                'any.only': 'sortOrder must be either asc or desc'
+            })
+    })
+};
+
+/**
+ * Income Validation Schemas
+ */
+const incomeSchemas = {
+    // Create income schema
+    create: Joi.object({
+        budgetSectionId: Joi.string()
+            .required()
+            .messages({
+                'string.base': 'Budget section ID must be a string',
+                'any.required': 'Budget section ID is required'
+            }),
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .required()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters',
+                'any.required': 'Title is required'
+            }),
+        amount: Joi.number()
+            .positive()
+            .min(0.01)
+            .required()
+            .messages({
+                'number.base': 'Amount must be a valid number',
+                'number.positive': 'Amount must be positive',
+                'number.min': 'Amount must be at least 0.01',
+                'any.required': 'Amount is required'
+            }),
+        date: Joi.date()
+            .required()
+            .messages({
+                'date.base': 'Date must be a valid date',
+                'any.required': 'Date is required'
+            }),
+        description: Joi.string()
+            .min(3)
+            .max(500)
+            .required()
+            .messages({
+                'string.min': 'Description must be at least 3 characters',
+                'string.max': 'Description must not exceed 500 characters',
+                'any.required': 'Description is required'
+            }),
+        sourceType: Joi.string()
+            .valid('SALARY', 'GIFT', 'SAVINGS', 'LOAN', 'OTHER')
+            .default('OTHER')
+            .required()
+            .messages({
+                'any.only': 'Source type must be one of the allowed values',
+                'any.required': 'Source type is required'
+            }),
+        notes: Joi.string()
+            .max(1000)
+            .allow('', null)
+            .optional()
+            .messages({
+                'string.max': 'Notes must not exceed 1000 characters'
+            }),
+        isActive: Joi.boolean()
+            .default(true)
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Update income schema
+    update: Joi.object({
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
+            }),
+        title: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Title must not be empty',
+                'string.max': 'Title must not exceed 100 characters'
+            }),
+        amount: Joi.number()
+            .positive()
+            .min(0.01)
+            .optional()
+            .messages({
+                'number.base': 'Amount must be a valid number',
+                'number.positive': 'Amount must be positive',
+                'number.min': 'Amount must be at least 0.01'
+            }),
+        date: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Date must be a valid date'
+            }),
+        description: Joi.string()
+            .min(3)
+            .max(500)
+            .optional()
+            .messages({
+                'string.min': 'Description must be at least 3 characters',
+                'string.max': 'Description must not exceed 500 characters'
+            }),
+        sourceType: Joi.string()
+            .valid('SALARY', 'GIFT', 'SAVINGS', 'LOAN', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Source type must be one of the allowed values'
+            }),
+        notes: Joi.string()
+            .max(1000)
+            .allow('', null)
+            .optional()
+            .messages({
+                'string.max': 'Notes must not exceed 1000 characters'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            })
+    }),
+
+    // Get incomes with filters schema
+    getAll: Joi.object({
+        page: Joi.number()
+            .integer()
+            .min(1)
+            .default(1)
+            .messages({
+                'number.base': 'Page must be a number',
+                'number.integer': 'Page must be an integer',
+                'number.min': 'Page must be at least 1'
+            }),
+        limit: Joi.number()
+            .integer()
+            .min(1)
+            .max(100)
+            .default(20)
+            .messages({
+                'number.base': 'Limit must be a number',
+                'number.integer': 'Limit must be an integer',
+                'number.min': 'Limit must be at least 1',
+                'number.max': 'Limit must not exceed 100'
+            }),
+        search: Joi.string()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Search term must be at least 1 character long',
+                'string.max': 'Search term must not exceed 100 characters'
+            }),
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
+            }),
+        sourceType: Joi.string()
+            .valid('SALARY', 'GIFT', 'SAVINGS', 'LOAN', 'OTHER')
+            .optional()
+            .messages({
+                'any.only': 'Source type must be one of the allowed values'
+            }),
+        isActive: Joi.boolean()
+            .optional()
+            .messages({
+                'boolean.base': 'isActive must be a boolean'
+            }),
+        sortBy: Joi.string()
+            .valid('createdAt', 'date', 'amount', 'title')
+            .default('date')
+            .messages({
+                'any.only': 'sortBy must be one of the allowed values'
+            }),
+        sortOrder: Joi.string()
+            .valid('asc', 'desc')
+            .default('desc')
+            .messages({
+                'any.only': 'sortOrder must be either asc or desc'
+            })
+    }),
+
+    // Get income statistics schema
+    getStatistics: Joi.object({
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
+            }),
+        startDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'Start date must be a valid date'
+            }),
+        endDate: Joi.date()
+            .optional()
+            .messages({
+                'date.base': 'End date must be a valid date'
+            })
+    })
+};
+
 module.exports = {
+    budgetSectionSchemas,
+    incomeSchemas,
     userSchemas,
     clientSchemas,
     transactionSchemas,

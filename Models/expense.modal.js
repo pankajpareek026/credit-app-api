@@ -45,6 +45,11 @@ const expenseSchema = new mongoose.Schema({
         trim: true,
         maxlength: 500
     },
+    budgetSectionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BudgetSection',
+        index: true
+    },
     isActive: {
         type: Boolean,
         default: true,
@@ -59,6 +64,7 @@ expenseSchema.index({ parentId: 1, date: -1 });
 expenseSchema.index({ parentId: 1, category: 1 });
 expenseSchema.index({ parentId: 1, paymentMethod: 1 });
 expenseSchema.index({ parentId: 1, isActive: 1 });
+expenseSchema.index({ budgetSectionId: 1, isActive: 1 });
 
 // Virtual for formatted amount
 expenseSchema.virtual('formattedAmount').get(function() {
