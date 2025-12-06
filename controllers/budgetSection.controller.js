@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const BudgetSection = require('../Models/budgetSection.modal');
 const Income = require('../Models/income.modal');
 const Expense = require('../Models/expense.modal');
@@ -36,7 +37,12 @@ const createBudgetSection = async (req, res, next) => {
  */
 const getAllBudgetSections = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
+        const { _id: parentIdRaw } = req.body.user;
+        // Convert parentId to ObjectId to ensure proper matching
+        const parentId = mongoose.Types.ObjectId.isValid(parentIdRaw) 
+            ? new mongoose.Types.ObjectId(parentIdRaw) 
+            : parentIdRaw;
+        
         const {
             page = 1,
             limit = 20,
@@ -78,12 +84,17 @@ const getAllBudgetSections = async (req, res, next) => {
             sections.map(async (section) => {
                 const sectionId = section._id;
                 
+                // Ensure sectionId is ObjectId for proper matching
+                const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId) 
+                    ? new mongoose.Types.ObjectId(sectionId) 
+                    : sectionId;
+                
                 // Calculate total income
                 const incomeResult = await Income.aggregate([
                     {
                         $match: {
                             parentId: parentId,
-                            budgetSectionId: sectionId,
+                            budgetSectionId: sectionObjectId,
                             isActive: true
                         }
                     },
@@ -109,7 +120,7 @@ const getAllBudgetSections = async (req, res, next) => {
                     {
                         $match: {
                             parentId: parentId,
-                            budgetSectionId: sectionId,
+                            budgetSectionId: sectionObjectId,
                             isActive: true
                         }
                     },
