@@ -654,18 +654,32 @@ const batchCreateTransactions = async (req, res, next) => {
 // Get transaction statistics
 const getTransactionStatistics = async (req, res, next) => {
     try {
-        const parentId = req.body.user._id;
+        const parentIdRaw = req.body.user._id;
         const { startDate, endDate, clientId } = req.query;
 
         console.log('📊 getTransactionStatistics: Request received');
-        console.log('📊 getTransactionStatistics: parentId:', parentId);
+        console.log('📊 getTransactionStatistics: parentIdRaw:', parentIdRaw, 'type:', typeof parentIdRaw);
         console.log('📊 getTransactionStatistics: startDate:', startDate);
         console.log('📊 getTransactionStatistics: endDate:', endDate);
         console.log('📊 getTransactionStatistics: clientId:', clientId);
 
+        // Convert parentId to ObjectId to ensure proper matching (handle both string and ObjectId)
+        let parentIdString = parentIdRaw?.toString();
+        let parentIdObjectId = null;
+        if (parentIdString && mongoose.Types.ObjectId.isValid(parentIdString)) {
+            try {
+                parentIdObjectId = new mongoose.Types.ObjectId(parentIdString);
+            } catch (e) {
+                console.warn("📊 Could not convert parentId to ObjectId:", e.message);
+            }
+        }
+
         // Build match conditions - exclude hidden transactions and separators
-        const matchConditions = { 
-            parentId,
+        // Handle both String and ObjectId formats for parentId (for backward compatibility)
+        const matchConditions = {
+            $or: parentIdObjectId 
+                ? [{ parentId: parentIdString }, { parentId: parentIdObjectId }]
+                : [{ parentId: parentIdString }],
             hidden: { $ne: true }, // Exclude hidden transactions
             isSeparator: { $ne: true } // Exclude separators
         };
@@ -673,7 +687,11 @@ const getTransactionStatistics = async (req, res, next) => {
         if (clientId) {
             // Convert clientId to ObjectId if it's a valid ObjectId string
             try {
-                matchConditions.clientId = new mongoose.Types.ObjectId(clientId);
+                if (mongoose.Types.ObjectId.isValid(clientId)) {
+                    matchConditions.clientId = new mongoose.Types.ObjectId(clientId);
+                } else {
+                    matchConditions.clientId = clientId;
+                }
             } catch (e) {
                 // If clientId is not a valid ObjectId, use it as string
                 matchConditions.clientId = clientId;
@@ -683,16 +701,22 @@ const getTransactionStatistics = async (req, res, next) => {
         if (startDate || endDate) {
             matchConditions.date = {};
             if (startDate) {
+                // Parse ISO string - handle both with and without timezone
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0); // Start of day
+                // Always set to start of day (00:00:00) in local timezone
+                // This ensures we capture all transactions from the start date
+                start.setHours(0, 0, 0, 0);
                 matchConditions.date.$gte = start;
-                console.log('📊 getTransactionStatistics: startDate parsed:', start);
+                console.log('📊 getTransactionStatistics: startDate parsed:', start.toISOString(), 'local:', start.toString());
             }
             if (endDate) {
+                // Parse ISO string - handle both with and without timezone
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999); // End of day
+                // Always set to end of day (23:59:59.999) in local timezone
+                // This ensures we capture all transactions until the end date
+                end.setHours(23, 59, 59, 999);
                 matchConditions.date.$lte = end;
-                console.log('📊 getTransactionStatistics: endDate parsed:', end);
+                console.log('📊 getTransactionStatistics: endDate parsed:', end.toISOString(), 'local:', end.toString());
             }
         }
 
@@ -725,6 +749,27 @@ const getTransactionStatistics = async (req, res, next) => {
         ]);
 
         console.log('📊 getTransactionStatistics: Aggregation result:', JSON.stringify(stats, null, 2));
+        console.log('📊 getTransactionStatistics: Number of results:', stats.length);
+
+        // If no results and we have date filters, try a test query without date filters to debug
+        if (stats.length === 0 && (startDate || endDate)) {
+            const testMatchConditions = {
+                $or: parentIdObjectId 
+                    ? [{ parentId: parentIdString }, { parentId: parentIdObjectId }]
+                    : [{ parentId: parentIdString }],
+                hidden: { $ne: true },
+                isSeparator: { $ne: true }
+            };
+            if (clientId) {
+                if (mongoose.Types.ObjectId.isValid(clientId)) {
+                    testMatchConditions.clientId = new mongoose.Types.ObjectId(clientId);
+                } else {
+                    testMatchConditions.clientId = clientId;
+                }
+            }
+            const testCount = await Transaction.countDocuments(testMatchConditions);
+            console.log('📊 getTransactionStatistics: Test query (no date filter) count:', testCount);
+        }
 
         const responseData = stats[0] || {
             totalTransactions: 0,
@@ -744,15 +789,18 @@ const getTransactionStatistics = async (req, res, next) => {
         }
 
         // Ensure all numeric values are properly set (handle null/undefined from aggregation)
-        responseData.totalTransactions = responseData.totalTransactions || 0;
-        responseData.totalAmount = responseData.totalAmount || 0;
-        responseData.averageAmount = responseData.averageAmount || 0;
-        responseData.maxAmount = responseData.maxAmount || 0;
-        responseData.minAmount = responseData.minAmount || 0;
-        responseData.creditTransactions = responseData.creditTransactions || 0;
-        responseData.debitTransactions = responseData.debitTransactions || 0;
-        responseData.creditAmount = responseData.creditAmount || 0;
-        responseData.debitAmount = responseData.debitAmount || 0;
+        // Use nullish coalescing and explicit number conversion
+        responseData.totalTransactions = Number(responseData.totalTransactions ?? 0);
+        responseData.totalAmount = Number(responseData.totalAmount ?? 0);
+        responseData.averageAmount = Number(responseData.averageAmount ?? 0);
+        responseData.maxAmount = Number(responseData.maxAmount ?? 0);
+        responseData.minAmount = Number(responseData.minAmount ?? 0);
+        responseData.creditTransactions = Number(responseData.creditTransactions ?? 0);
+        responseData.debitTransactions = Number(responseData.debitTransactions ?? 0);
+        responseData.creditAmount = Number(responseData.creditAmount ?? 0);
+        responseData.debitAmount = Number(responseData.debitAmount ?? 0);
+        
+        console.log('📊 getTransactionStatistics: Final responseData after normalization:', JSON.stringify(responseData, null, 2));
 
         console.log('📊 getTransactionStatistics: Final responseData:', JSON.stringify(responseData, null, 2));
 
