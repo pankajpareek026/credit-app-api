@@ -657,14 +657,46 @@ const getTransactionStatistics = async (req, res, next) => {
         const parentId = req.body.user._id;
         const { startDate, endDate, clientId } = req.query;
 
-        // Build match conditions
-        const matchConditions = { parentId };
-        if (clientId) matchConditions.clientId = clientId;
+        console.log('📊 getTransactionStatistics: Request received');
+        console.log('📊 getTransactionStatistics: parentId:', parentId);
+        console.log('📊 getTransactionStatistics: startDate:', startDate);
+        console.log('📊 getTransactionStatistics: endDate:', endDate);
+        console.log('📊 getTransactionStatistics: clientId:', clientId);
+
+        // Build match conditions - exclude hidden transactions and separators
+        const matchConditions = { 
+            parentId,
+            hidden: { $ne: true }, // Exclude hidden transactions
+            isSeparator: { $ne: true } // Exclude separators
+        };
+        
+        if (clientId) {
+            // Convert clientId to ObjectId if it's a valid ObjectId string
+            try {
+                matchConditions.clientId = new mongoose.Types.ObjectId(clientId);
+            } catch (e) {
+                // If clientId is not a valid ObjectId, use it as string
+                matchConditions.clientId = clientId;
+            }
+        }
+        
         if (startDate || endDate) {
             matchConditions.date = {};
-            if (startDate) matchConditions.date.$gte = new Date(startDate);
-            if (endDate) matchConditions.date.$lte = new Date(endDate);
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0); // Start of day
+                matchConditions.date.$gte = start;
+                console.log('📊 getTransactionStatistics: startDate parsed:', start);
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999); // End of day
+                matchConditions.date.$lte = end;
+                console.log('📊 getTransactionStatistics: endDate parsed:', end);
+            }
         }
+
+        console.log('📊 getTransactionStatistics: Match conditions:', JSON.stringify(matchConditions, null, 2));
 
         const stats = await Transaction.aggregate([
             { $match: matchConditions },
@@ -692,6 +724,8 @@ const getTransactionStatistics = async (req, res, next) => {
             }
         ]);
 
+        console.log('📊 getTransactionStatistics: Aggregation result:', JSON.stringify(stats, null, 2));
+
         const responseData = stats[0] || {
             totalTransactions: 0,
             totalAmount: 0,
@@ -709,11 +743,26 @@ const getTransactionStatistics = async (req, res, next) => {
             delete responseData._id;
         }
 
+        // Ensure all numeric values are properly set (handle null/undefined from aggregation)
+        responseData.totalTransactions = responseData.totalTransactions || 0;
+        responseData.totalAmount = responseData.totalAmount || 0;
+        responseData.averageAmount = responseData.averageAmount || 0;
+        responseData.maxAmount = responseData.maxAmount || 0;
+        responseData.minAmount = responseData.minAmount || 0;
+        responseData.creditTransactions = responseData.creditTransactions || 0;
+        responseData.debitTransactions = responseData.debitTransactions || 0;
+        responseData.creditAmount = responseData.creditAmount || 0;
+        responseData.debitAmount = responseData.debitAmount || 0;
+
+        console.log('📊 getTransactionStatistics: Final responseData:', JSON.stringify(responseData, null, 2));
+
+        // Use toResponse() to ensure proper serialization
         const apiResponse = new ApiResponse(true, false, "Transaction statistics retrieved successfully", responseData);
-        return res.status(200).json(apiResponse);
+        return res.status(200).json(apiResponse.toResponse());
 
     } catch (error) {
-        console.error("Error in getTransactionStatistics:", error.message);
+        console.error("❌ Error in getTransactionStatistics:", error);
+        console.error("❌ Error stack:", error.stack);
         return next(new ApiError(500, "Internal server error"));
     }
 };
