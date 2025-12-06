@@ -61,6 +61,8 @@ const getAllIncomes = async (req, res, next) => {
             budgetSectionId,
             sourceType,
             isActive = true,
+            startDate,
+            endDate,
             sortBy = 'date',
             sortOrder = 'desc'
         } = req.query;
@@ -74,6 +76,12 @@ const getAllIncomes = async (req, res, next) => {
 
         if (sourceType) {
             filter.sourceType = sourceType;
+        }
+
+        if (startDate || endDate) {
+            filter.date = {};
+            if (startDate) filter.date.$gte = new Date(startDate);
+            if (endDate) filter.date.$lte = new Date(endDate);
         }
 
         if (search) {

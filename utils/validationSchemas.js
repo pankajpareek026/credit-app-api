@@ -1122,6 +1122,11 @@ const expenseSchemas = {
                 'string.min': 'Search term must be at least 2 characters long',
                 'string.max': 'Search term must not exceed 100 characters'
             }),
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
+            }),
         category: Joi.string()
             .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
             .optional()

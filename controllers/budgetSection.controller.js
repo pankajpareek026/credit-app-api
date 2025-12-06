@@ -313,12 +313,13 @@ const deleteBudgetSection = async (req, res, next) => {
 };
 
 /**
- * Get budget section statistics
+ * Get budget section statistics with enhanced insights
  */
 const getBudgetSectionStatistics = async (req, res, next) => {
     try {
         const { _id: parentId } = req.body.user;
         const { sectionId } = req.params;
+        const { startDate, endDate } = req.query;
 
         const sectionData = await BudgetSection.findOne({ _id: sectionId, parentId }).lean();
 
@@ -326,56 +327,138 @@ const getBudgetSectionStatistics = async (req, res, next) => {
             return next(ApiError.notFoundError('Budget section not found'));
         }
 
+        // Build base filter
+        const baseFilter = {
+            parentId: parentId,
+            budgetSectionId: sectionData._id,
+            isActive: true
+        };
+
+        // Add date range filter if provided
+        if (startDate || endDate) {
+            baseFilter.date = {};
+            if (startDate) baseFilter.date.$gte = new Date(startDate);
+            if (endDate) baseFilter.date.$lte = new Date(endDate);
+        }
+
         // Calculate total income
         const incomeResult = await Income.aggregate([
-            {
-                $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
-                    isActive: true
-                }
-            },
+            { $match: baseFilter },
             {
                 $group: {
                     _id: null,
-                    total: { $sum: '$amount' }
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 },
+                    avg: { $avg: '$amount' }
                 }
             }
         ]);
 
         const totalIncome = incomeResult.length > 0 ? incomeResult[0].total : 0;
+        const incomeCount = incomeResult.length > 0 ? incomeResult[0].count : 0;
+        const avgIncome = incomeResult.length > 0 ? incomeResult[0].avg : 0;
 
         // Calculate total expenses
         const expenseResult = await Expense.aggregate([
-            {
-                $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
-                    isActive: true
-                }
-            },
+            { $match: baseFilter },
             {
                 $group: {
                     _id: null,
-                    total: { $sum: '$amount' }
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 },
+                    avg: { $avg: '$amount' }
                 }
             }
         ]);
 
         const totalExpenses = expenseResult.length > 0 ? expenseResult[0].total : 0;
+        const expenseCount = expenseResult.length > 0 ? expenseResult[0].count : 0;
+        const avgExpense = expenseResult.length > 0 ? expenseResult[0].avg : 0;
 
-        // Calculate balance
+        // Calculate balance (income - expenses)
         const balance = totalIncome - totalExpenses;
+
+        // Daily income breakdown
+        const dailyIncomeBreakdown = await Income.aggregate([
+            { $match: baseFilter },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: '$date' },
+                        month: { $month: '$date' },
+                        day: { $dayOfMonth: '$date' }
+                    },
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id.year': -1, '_id.month': -1, '_id.day': -1 } }
+        ]);
+
+        // Daily expense breakdown
+        const dailyExpenseBreakdown = await Expense.aggregate([
+            { $match: baseFilter },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: '$date' },
+                        month: { $month: '$date' },
+                        day: { $dayOfMonth: '$date' }
+                    },
+                    total: { $sum: '$amount' },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id.year': -1, '_id.month': -1, '_id.day': -1 } }
+        ]);
+
+        // Find most earning day (highest income day)
+        let mostEarningDay = null;
+        let maxIncomeDayTotal = 0;
+        if (dailyIncomeBreakdown.length > 0) {
+            const sortedByIncome = [...dailyIncomeBreakdown].sort((a, b) => b.total - a.total);
+            if (sortedByIncome[0].total > 0) {
+                mostEarningDay = {
+                    date: new Date(sortedByIncome[0]._id.year, sortedByIncome[0]._id.month - 1, sortedByIncome[0]._id.day),
+                    total: sortedByIncome[0].total,
+                    count: sortedByIncome[0].count
+                };
+                maxIncomeDayTotal = sortedByIncome[0].total;
+            }
+        }
+
+        // Find most expensive day (highest expense day)
+        let mostExpensiveDay = null;
+        let maxExpenseDayTotal = 0;
+        if (dailyExpenseBreakdown.length > 0) {
+            const sortedByExpense = [...dailyExpenseBreakdown].sort((a, b) => b.total - a.total);
+            if (sortedByExpense[0].total > 0) {
+                mostExpensiveDay = {
+                    date: new Date(sortedByExpense[0]._id.year, sortedByExpense[0]._id.month - 1, sortedByExpense[0]._id.day),
+                    total: sortedByExpense[0].total,
+                    count: sortedByExpense[0].count
+                };
+                maxExpenseDayTotal = sortedByExpense[0].total;
+            }
+        }
+
+        // Calculate average daily income (if we have daily breakdown)
+        let avgDailyIncome = 0;
+        if (dailyIncomeBreakdown.length > 0) {
+            const sumOfDailyIncomes = dailyIncomeBreakdown.reduce((sum, day) => sum + day.total, 0);
+            avgDailyIncome = sumOfDailyIncomes / dailyIncomeBreakdown.length;
+        }
+
+        // Calculate average daily expense
+        let avgDailyExpense = 0;
+        if (dailyExpenseBreakdown.length > 0) {
+            const sumOfDailyExpenses = dailyExpenseBreakdown.reduce((sum, day) => sum + day.total, 0);
+            avgDailyExpense = sumOfDailyExpenses / dailyExpenseBreakdown.length;
+        }
 
         // Income source breakdown
         const incomeSourceBreakdown = await Income.aggregate([
-            {
-                $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
-                    isActive: true
-                }
-            },
+            { $match: baseFilter },
             {
                 $group: {
                     _id: '$sourceType',
@@ -388,13 +471,7 @@ const getBudgetSectionStatistics = async (req, res, next) => {
 
         // Expense category breakdown
         const expenseCategoryBreakdown = await Expense.aggregate([
-            {
-                $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
-                    isActive: true
-                }
-            },
+            { $match: baseFilter },
             {
                 $group: {
                     _id: '$category',
@@ -405,10 +482,41 @@ const getBudgetSectionStatistics = async (req, res, next) => {
             { $sort: { total: -1 } }
         ]);
 
+        // Format daily breakdowns for easier consumption
+        const formattedDailyIncome = dailyIncomeBreakdown.map(item => ({
+            date: new Date(item._id.year, item._id.month - 1, item._id.day).toISOString(),
+            total: item.total,
+            count: item.count
+        }));
+
+        const formattedDailyExpense = dailyExpenseBreakdown.map(item => ({
+            date: new Date(item._id.year, item._id.month - 1, item._id.day).toISOString(),
+            total: item.total,
+            count: item.count
+        }));
+
         const statistics = {
             totalIncome,
             totalExpenses,
             balance,
+            incomeCount,
+            expenseCount,
+            avgIncome,
+            avgExpense,
+            avgDailyIncome,
+            avgDailyExpense,
+            mostEarningDay: mostEarningDay ? {
+                date: mostEarningDay.date.toISOString(),
+                total: mostEarningDay.total,
+                count: mostEarningDay.count
+            } : null,
+            mostExpensiveDay: mostExpensiveDay ? {
+                date: mostExpensiveDay.date.toISOString(),
+                total: mostExpensiveDay.total,
+                count: mostExpensiveDay.count
+            } : null,
+            dailyIncomeBreakdown: formattedDailyIncome,
+            dailyExpenseBreakdown: formattedDailyExpense,
             incomeSourceBreakdown,
             expenseCategoryBreakdown,
             targetBudget: sectionData.targetBudget || null,

@@ -22,6 +22,7 @@ const createExpense = async (req, res, next) => {
             date,
             category,
             paymentMethod,
+            budgetSectionId,
             tags,
             notes,
             isActive
@@ -46,6 +47,11 @@ const createExpense = async (req, res, next) => {
             tags: Array.isArray(tags) ? tags.filter(tag => tag && tag.trim()).map(tag => tag.trim()) : [],
             isActive: isActive !== undefined ? Boolean(isActive) : true
         };
+
+        // Only include budgetSectionId if it's provided (optional field)
+        if (budgetSectionId) {
+            expenseData.budgetSectionId = budgetSectionId;
+        }
 
         // Only include notes if it's provided and not empty
         if (notes && notes.trim()) {
@@ -90,6 +96,7 @@ const getAllExpenses = async (req, res, next) => {
             search,
             category,
             paymentMethod,
+            budgetSectionId,
             isActive = true,
             startDate,
             endDate,
@@ -114,6 +121,10 @@ const getAllExpenses = async (req, res, next) => {
 
         if (paymentMethod) {
             filter.paymentMethod = paymentMethod;
+        }
+
+        if (budgetSectionId) {
+            filter.budgetSectionId = budgetSectionId;
         }
 
         if (startDate || endDate) {
