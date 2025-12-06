@@ -76,52 +76,80 @@ const getAllBudgetSections = async (req, res, next) => {
         // Calculate total income, total expenses, and balance for each section
         const sectionsWithBalance = await Promise.all(
             sections.map(async (section) => {
+                const sectionId = section._id;
+                
                 // Calculate total income
                 const incomeResult = await Income.aggregate([
                     {
                         $match: {
                             parentId: parentId,
-                            budgetSectionId: section._id,
+                            budgetSectionId: sectionId,
                             isActive: true
                         }
                     },
                     {
                         $group: {
                             _id: null,
-                            total: { $sum: '$amount' }
+                            total: { $sum: '$amount' },
+                            count: { $sum: 1 }
                         }
                     }
                 ]);
 
-                const totalIncome = incomeResult.length > 0 ? incomeResult[0].total : 0;
+                // Explicitly convert to numbers to ensure proper serialization
+                const totalIncome = incomeResult.length > 0 
+                    ? Number(incomeResult[0].total || 0) 
+                    : 0;
+                const incomeCount = incomeResult.length > 0 
+                    ? Number(incomeResult[0].count || 0) 
+                    : 0;
 
                 // Calculate total expenses
                 const expenseResult = await Expense.aggregate([
                     {
                         $match: {
                             parentId: parentId,
-                            budgetSectionId: section._id,
+                            budgetSectionId: sectionId,
                             isActive: true
                         }
                     },
                     {
                         $group: {
                             _id: null,
-                            total: { $sum: '$amount' }
+                            total: { $sum: '$amount' },
+                            count: { $sum: 1 }
                         }
                     }
                 ]);
 
-                const totalExpenses = expenseResult.length > 0 ? expenseResult[0].total : 0;
+                const totalExpenses = expenseResult.length > 0 
+                    ? Number(expenseResult[0].total || 0) 
+                    : 0;
+                const expenseCount = expenseResult.length > 0 
+                    ? Number(expenseResult[0].count || 0) 
+                    : 0;
 
                 // Calculate balance (can be negative)
-                const balance = totalIncome - totalExpenses;
+                const balance = Number(totalIncome) - Number(totalExpenses);
 
+                // Debug logging
+                console.log(`Section ${section.title} (${sectionId}): Income=${totalIncome} (${incomeCount} entries), Expenses=${totalExpenses} (${expenseCount} entries), Balance=${balance}`);
+
+                // Create a new plain object with explicit totals (avoid spread operator issues)
                 return {
-                    ...section,
-                    totalIncome,
-                    totalExpenses,
-                    balance
+                    _id: section._id,
+                    parentId: section.parentId,
+                    title: section.title,
+                    description: section.description,
+                    startDate: section.startDate,
+                    endDate: section.endDate,
+                    targetBudget: section.targetBudget,
+                    isActive: section.isActive,
+                    createdAt: section.createdAt,
+                    updatedAt: section.updatedAt,
+                    totalIncome: Number(totalIncome),
+                    totalExpenses: Number(totalExpenses),
+                    balance: Number(balance)
                 };
             })
         );
