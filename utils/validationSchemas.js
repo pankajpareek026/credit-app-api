@@ -1026,6 +1026,11 @@ const expenseSchemas = {
             .optional()
             .messages({
                 'string.max': 'Notes must not exceed 500 characters'
+            }),
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
             })
     }),
 
@@ -1084,6 +1089,11 @@ const expenseSchemas = {
             .optional()
             .messages({
                 'string.max': 'Notes must not exceed 500 characters'
+            }),
+        budgetSectionId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Budget section ID must be a string'
             }),
         isActive: Joi.boolean()
             .optional()
