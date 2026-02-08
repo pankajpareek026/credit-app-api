@@ -31,7 +31,7 @@ const createIncome = async (req, res, next) => {
         }
 
         const newIncome = await Income.create(incomeData);
-        
+
         return res.status(201).json(
             ApiResponse.created(newIncome, "Income created successfully")
         );
@@ -273,19 +273,18 @@ const deleteIncome = async (req, res, next) => {
 const getIncomeStatistics = async (req, res, next) => {
     try {
         const { _id: parentId } = req.body.user;
-        const { budgetSectionId, startDate, endDate } = req.query;
+        // Ensure IDs are ObjectIds for aggregation
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId)
+            ? new mongoose.Types.ObjectId(parentId)
+            : parentId;
 
         // Build filter object
-        const filter = { parentId, isActive: true };
+        const filter = { parentId: parentObjectId, isActive: true };
 
         if (budgetSectionId) {
-            filter.budgetSectionId = budgetSectionId;
-        }
-
-        if (startDate || endDate) {
-            filter.date = {};
-            if (startDate) filter.date.$gte = new Date(startDate);
-            if (endDate) filter.date.$lte = new Date(endDate);
+            filter.budgetSectionId = mongoose.Types.ObjectId.isValid(budgetSectionId)
+                ? new mongoose.Types.ObjectId(budgetSectionId)
+                : budgetSectionId;
         }
 
         // Get basic statistics

@@ -255,11 +255,13 @@ const deleteExpense = async (req, res, next) => {
  */
 const getExpenseStatistics = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
-        const { startDate, endDate, category, paymentMethod } = req.query;
+        // Ensure IDs are ObjectIds for aggregation
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId)
+            ? new mongoose.Types.ObjectId(parentId)
+            : parentId;
 
         // Build filter object
-        const filter = { parentId, isActive: true };
+        const filter = { parentId: parentObjectId, isActive: true };
 
         if (category) {
             filter.category = category;

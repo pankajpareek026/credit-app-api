@@ -79,7 +79,71 @@ const getAllBudgetSections = async (req, res, next) => {
             BudgetSection.countDocuments(filter)
         ]);
 
-        // Calculate total income, total expenses, and balance for each section
+        // Calculate global totals for ALL active sections for this user (ignoring pagination)
+        // This includes items with no section (floating) and items in active sections,
+        // but EXCLUDES items in deleted (isActive: false) sections.
+        const [globalIncomeResult, globalExpenseResult] = await Promise.all([
+            Income.aggregate([
+                {
+                    $lookup: {
+                        from: 'budgetsections',
+                        localField: 'budgetSectionId',
+                        foreignField: '_id',
+                        as: 'section'
+                    }
+                },
+                {
+                    $match: {
+                        parentId: parentId,
+                        isActive: true,
+                        $or: [
+                            { budgetSectionId: { $exists: false } },
+                            { budgetSectionId: null },
+                            { 'section.isActive': true }
+                        ]
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$amount' }
+                    }
+                }
+            ]),
+            Expense.aggregate([
+                {
+                    $lookup: {
+                        from: 'budgetsections',
+                        localField: 'budgetSectionId',
+                        foreignField: '_id',
+                        as: 'section'
+                    }
+                },
+                {
+                    $match: {
+                        parentId: parentId,
+                        isActive: true,
+                        $or: [
+                            { budgetSectionId: { $exists: false } },
+                            { budgetSectionId: null },
+                            { 'section.isActive': true }
+                        ]
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$amount' }
+                    }
+                }
+            ])
+        ]);
+
+        const globalIncome = globalIncomeResult.length > 0 ? Number(globalIncomeResult[0].total || 0) : 0;
+        const globalExpenses = globalExpenseResult.length > 0 ? Number(globalExpenseResult[0].total || 0) : 0;
+        const globalBalance = globalIncome - globalExpenses;
+
+        // Calculate total income, total expenses, and balance for each section in the CURRENT PAGINATED LIST
         const sectionsWithBalance = await Promise.all(
             sections.map(async (section) => {
                 const sectionId = section._id;
@@ -101,8 +165,7 @@ const getAllBudgetSections = async (req, res, next) => {
                     {
                         $group: {
                             _id: null,
-                            total: { $sum: '$amount' },
-                            count: { $sum: 1 }
+                            total: { $sum: '$amount' }
                         }
                     }
                 ]);
@@ -110,9 +173,6 @@ const getAllBudgetSections = async (req, res, next) => {
                 // Explicitly convert to numbers to ensure proper serialization
                 const totalIncome = incomeResult.length > 0
                     ? Number(incomeResult[0].total || 0)
-                    : 0;
-                const incomeCount = incomeResult.length > 0
-                    ? Number(incomeResult[0].count || 0)
                     : 0;
 
                 // Calculate total expenses
@@ -127,8 +187,7 @@ const getAllBudgetSections = async (req, res, next) => {
                     {
                         $group: {
                             _id: null,
-                            total: { $sum: '$amount' },
-                            count: { $sum: 1 }
+                            total: { $sum: '$amount' }
                         }
                     }
                 ]);
@@ -136,28 +195,12 @@ const getAllBudgetSections = async (req, res, next) => {
                 const totalExpenses = expenseResult.length > 0
                     ? Number(expenseResult[0].total || 0)
                     : 0;
-                const expenseCount = expenseResult.length > 0
-                    ? Number(expenseResult[0].count || 0)
-                    : 0;
 
                 // Calculate balance (can be negative)
                 const balance = Number(totalIncome) - Number(totalExpenses);
 
-                // Debug logging
-                console.log(`Section ${section.title} (${sectionId}): Income=${totalIncome} (${incomeCount} entries), Expenses=${totalExpenses} (${expenseCount} entries), Balance=${balance}`);
-
-                // Create a new plain object with explicit totals (avoid spread operator issues)
                 return {
-                    _id: section._id,
-                    parentId: section.parentId,
-                    title: section.title,
-                    description: section.description,
-                    startDate: section.startDate,
-                    endDate: section.endDate,
-                    targetBudget: section.targetBudget,
-                    isActive: section.isActive,
-                    createdAt: section.createdAt,
-                    updatedAt: section.updatedAt,
+                    ...section,
                     totalIncome: Number(totalIncome),
                     totalExpenses: Number(totalExpenses),
                     balance: Number(balance)
@@ -179,8 +222,17 @@ const getAllBudgetSections = async (req, res, next) => {
             hasPrevPage
         };
 
+        const responseData = {
+            sections: sectionsWithBalance,
+            globalOverview: {
+                totalIncome: globalIncome,
+                totalExpenses: globalExpenses,
+                balance: globalBalance
+            }
+        };
+
         return res.status(200).json(
-            ApiResponse.paginated(sectionsWithBalance, pagination, "Budget sections retrieved successfully")
+            ApiResponse.paginated(responseData, pagination, "Budget sections retrieved successfully")
         );
     } catch (error) {
         console.error('Get all budget sections error:', error);

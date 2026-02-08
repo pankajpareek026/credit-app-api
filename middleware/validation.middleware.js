@@ -11,14 +11,14 @@ const validateRequest = (schema, source = 'body') => {
     return (req, res, next) => {
         try {
             const data = req[source];
-            
+
             // Preserve user object if validating body (added by auth middleware)
             const preservedUser = source === 'body' ? req.body?.user : null;
-            
+
             const { error, value } = schema.validate(data, {
                 abortEarly: false,
                 stripUnknown: true,
-                allowUnknown: false
+                allowUnknown: true
             });
 
             if (error) {
@@ -33,12 +33,12 @@ const validateRequest = (schema, source = 'body') => {
 
             // Replace the request data with validated data
             req[source] = value;
-            
+
             // Restore preserved user object if validating body
             if (source === 'body' && preservedUser) {
                 req.body.user = preservedUser;
             }
-            
+
             next();
         } catch (error) {
             return next(new ApiError(500, "Validation middleware error"));
@@ -82,7 +82,7 @@ const sanitizeInput = (req, res, next) => {
  */
 const sanitizeObject = (obj) => {
     const sanitized = {};
-    
+
     for (const [key, value] of Object.entries(obj)) {
         if (typeof value === 'string') {
             // Remove HTML tags and encode special characters
@@ -96,7 +96,7 @@ const sanitizeObject = (obj) => {
             sanitized[key] = value;
         }
     }
-    
+
     return sanitized;
 };
 
@@ -118,15 +118,15 @@ const validateObjectId = (id) => {
 const validateObjectIdParam = (paramName) => {
     return (req, res, next) => {
         const id = req.params[paramName] || req.body[paramName] || req.query[paramName];
-        
+
         if (!id) {
             return next(new ApiError(400, `${paramName} is required`));
         }
-        
+
         if (!validateObjectId(id)) {
             return next(new ApiError(400, `Invalid ${paramName} format`));
         }
-        
+
         next();
     };
 };
@@ -140,23 +140,23 @@ const validateObjectIdParam = (paramName) => {
 const validatePagination = (req, res, next) => {
     try {
         const { page = 1, limit = 20 } = req.query;
-        
+
         // Validate page
         const pageNum = parseInt(page);
         if (isNaN(pageNum) || pageNum < 1) {
             return next(new ApiError(400, "Page must be a positive integer"));
         }
-        
+
         // Validate limit
         const limitNum = parseInt(limit);
         if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
             return next(new ApiError(400, "Limit must be between 1 and 100"));
         }
-        
+
         // Set validated values
         req.query.page = pageNum;
         req.query.limit = limitNum;
-        
+
         next();
     } catch (error) {
         return next(new ApiError(500, "Pagination validation error"));
@@ -172,7 +172,7 @@ const validatePagination = (req, res, next) => {
 const validateDateRange = (req, res, next) => {
     try {
         const { startDate, endDate } = req.query;
-        
+
         if (startDate) {
             const start = new Date(startDate);
             if (isNaN(start.getTime())) {
@@ -180,7 +180,7 @@ const validateDateRange = (req, res, next) => {
             }
             req.query.startDate = start;
         }
-        
+
         if (endDate) {
             const end = new Date(endDate);
             if (isNaN(end.getTime())) {
@@ -188,12 +188,12 @@ const validateDateRange = (req, res, next) => {
             }
             req.query.endDate = end;
         }
-        
+
         // Validate date range
         if (startDate && endDate && req.query.startDate >= req.query.endDate) {
             return next(new ApiError(400, "Start date must be before end date"));
         }
-        
+
         next();
     } catch (error) {
         return next(new ApiError(500, "Date range validation error"));
@@ -210,29 +210,29 @@ const validateSearchQuery = (req, res, next) => {
     try {
         const { search, query } = req.query;
         const searchTerm = search || query;
-        
+
         if (searchTerm) {
             // Validate search term length
             if (typeof searchTerm !== 'string' || searchTerm.length < 2) {
                 return next(new ApiError(400, "Search term must be at least 2 characters"));
             }
-            
+
             if (searchTerm.length > 100) {
                 return next(new ApiError(400, "Search term too long (max 100 characters)"));
             }
-            
+
             // Sanitize search term
             const sanitized = searchTerm
                 .replace(/[<>]/g, '')
                 .trim();
-            
+
             if (sanitized.length < 2) {
                 return next(new ApiError(400, "Search term too short after sanitization"));
             }
-            
+
             req.query.search = sanitized;
         }
-        
+
         next();
     } catch (error) {
         return next(new ApiError(500, "Search validation error"));
@@ -247,11 +247,11 @@ const validateSearchQuery = (req, res, next) => {
 const validateRequestSize = (maxSize = 10 * 1024 * 1024) => { // 10MB default
     return (req, res, next) => {
         const contentLength = parseInt(req.get('Content-Length') || '0');
-        
+
         if (contentLength > maxSize) {
             return next(new ApiError(413, `Request too large. Maximum size is ${maxSize / (1024 * 1024)}MB`));
         }
-        
+
         next();
     };
 };
@@ -264,11 +264,11 @@ const validateRequestSize = (maxSize = 10 * 1024 * 1024) => { // 10MB default
 const validateContentType = (expectedType = 'application/json') => {
     return (req, res, next) => {
         const contentType = req.get('Content-Type');
-        
+
         if (!contentType || !contentType.includes(expectedType)) {
             return next(new ApiError(415, `Unsupported media type. Expected ${expectedType}`));
         }
-        
+
         next();
     };
 };
@@ -283,17 +283,17 @@ const validateRequiredFields = (requiredFields, source = 'body') => {
     return (req, res, next) => {
         const data = req[source];
         const missingFields = [];
-        
+
         for (const field of requiredFields) {
             if (!data || data[field] === undefined || data[field] === null || data[field] === '') {
                 missingFields.push(field);
             }
         }
-        
+
         if (missingFields.length > 0) {
             return next(new ApiError(400, `Missing required fields: ${missingFields.join(', ')}`));
         }
-        
+
         next();
     };
 };
@@ -308,7 +308,7 @@ const validateFieldLengths = (fieldRules, source = 'body') => {
     return (req, res, next) => {
         const data = req[source];
         const errors = [];
-        
+
         for (const [field, maxLength] of Object.entries(fieldRules)) {
             if (data && data[field] && typeof data[field] === 'string') {
                 if (data[field].length > maxLength) {
@@ -316,11 +316,11 @@ const validateFieldLengths = (fieldRules, source = 'body') => {
                 }
             }
         }
-        
+
         if (errors.length > 0) {
             return next(new ApiError(400, errors.join(', ')));
         }
-        
+
         next();
     };
 };
@@ -335,13 +335,13 @@ const validateFieldLengths = (fieldRules, source = 'body') => {
 const validateEnum = (field, allowedValues, source = 'body') => {
     return (req, res, next) => {
         const data = req[source];
-        
+
         if (data && data[field] !== undefined) {
             if (!allowedValues.includes(data[field])) {
                 return next(new ApiError(400, `${field} must be one of: ${allowedValues.join(', ')}`));
             }
         }
-        
+
         next();
     };
 };
@@ -357,19 +357,19 @@ const validateEnum = (field, allowedValues, source = 'body') => {
 const validateNumberRange = (field, min, max, source = 'body') => {
     return (req, res, next) => {
         const data = req[source];
-        
+
         if (data && data[field] !== undefined) {
             const num = parseFloat(data[field]);
-            
+
             if (isNaN(num)) {
                 return next(new ApiError(400, `${field} must be a valid number`));
             }
-            
+
             if (num < min || num > max) {
                 return next(new ApiError(400, `${field} must be between ${min} and ${max}`));
             }
         }
-        
+
         next();
     };
 };
