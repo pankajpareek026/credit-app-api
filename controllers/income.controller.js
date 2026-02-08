@@ -8,8 +8,28 @@ const ApiResponse = require('../utils/apiResponse.utils');
  */
 const createIncome = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
-        const incomeData = { ...req.body, parentId };
+        const {
+            budgetSectionId,
+            title,
+            amount,
+            date,
+            description,
+            sourceType,
+            notes,
+            isActive
+        } = req.body;
+
+        const incomeData = {
+            parentId,
+            budgetSectionId,
+            title,
+            amount,
+            date,
+            description,
+            sourceType,
+            notes,
+            isActive
+        };
 
         // Validate budget section exists and belongs to user
         const budgetSection = await BudgetSection.findOne({
@@ -220,9 +240,30 @@ const updateIncome = async (req, res, next) => {
             }
         }
 
+        const {
+            budgetSectionId,
+            title,
+            amount,
+            date,
+            description,
+            sourceType,
+            notes,
+            isActive
+        } = req.body;
+
         const updatedIncome = await Income.findByIdAndUpdate(
             incomeId,
-            { ...req.body, updatedAt: new Date() },
+            {
+                budgetSectionId,
+                title,
+                amount,
+                date,
+                description,
+                sourceType,
+                notes,
+                isActive,
+                updatedAt: new Date()
+            },
             { new: true, runValidators: true }
         );
 

@@ -210,9 +210,32 @@ const updateExpense = async (req, res, next) => {
             return next(ApiError.notFoundError('Expense not found'));
         }
 
+        const {
+            title,
+            amount,
+            date,
+            category,
+            paymentMethod,
+            tags,
+            notes,
+            budgetSectionId,
+            isActive
+        } = req.body;
+
         const updatedExpense = await expense.findByIdAndUpdate(
             expenseId,
-            { ...req.body, updatedAt: new Date() },
+            {
+                title,
+                amount,
+                date,
+                category,
+                paymentMethod,
+                tags,
+                notes,
+                budgetSectionId,
+                isActive,
+                updatedAt: new Date()
+            },
             { new: true, runValidators: true }
         );
 

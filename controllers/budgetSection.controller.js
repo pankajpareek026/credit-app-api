@@ -10,8 +10,24 @@ const ApiResponse = require('../utils/apiResponse.utils');
  */
 const createBudgetSection = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
-        const budgetSectionData = { ...req.body, parentId };
+        const {
+            title,
+            description,
+            startDate,
+            endDate,
+            targetBudget,
+            isActive
+        } = req.body;
+
+        const budgetSectionData = {
+            parentId,
+            title,
+            description,
+            startDate,
+            endDate,
+            targetBudget,
+            isActive
+        };
 
         // Validate end date is after start date
         if (new Date(budgetSectionData.endDate) <= new Date(budgetSectionData.startDate)) {
@@ -371,9 +387,26 @@ const updateBudgetSection = async (req, res, next) => {
             }
         }
 
+        const {
+            title,
+            description,
+            startDate,
+            endDate,
+            targetBudget,
+            isActive
+        } = req.body;
+
         const updatedSection = await BudgetSection.findByIdAndUpdate(
             sectionId,
-            { ...req.body, updatedAt: new Date() },
+            {
+                title,
+                description,
+                startDate,
+                endDate,
+                targetBudget,
+                isActive,
+                updatedAt: new Date()
+            },
             { new: true, runValidators: true }
         ).lean();
 

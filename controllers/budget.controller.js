@@ -8,8 +8,28 @@ const ApiResponse = require('../utils/apiResponse.utils');
  */
 const createBudget = async (req, res, next) => {
     try {
-        const { _id: parentId } = req.body.user;
-        const budgetData = { ...req.body, parentId };
+        const {
+            title,
+            allocatedAmount,
+            spentAmount,
+            category,
+            period,
+            startDate,
+            endDate,
+            isActive
+        } = req.body;
+
+        const budgetData = {
+            parentId,
+            title,
+            allocatedAmount,
+            spentAmount,
+            category,
+            period,
+            startDate,
+            endDate,
+            isActive
+        };
 
         // Validate end date is after start date
         if (new Date(budgetData.endDate) <= new Date(budgetData.startDate)) {
@@ -20,7 +40,7 @@ const createBudget = async (req, res, next) => {
         }
 
         const newBudget = await Budget.create(budgetData);
-        
+
         return res.status(201).json(
             ApiResponse.created(newBudget, "Budget created successfully")
         );
@@ -86,7 +106,7 @@ const getAllBudgets = async (req, res, next) => {
             budgets.map(async (budget) => {
                 const startDate = new Date(budget.startDate);
                 const endDate = new Date(budget.endDate);
-                
+
                 // Calculate spent amount from expenses in this budget period and category
                 const expenses = await Expense.aggregate([
                     {
@@ -106,7 +126,7 @@ const getAllBudgets = async (req, res, next) => {
                 ]);
 
                 const spentAmount = expenses.length > 0 ? expenses[0].total : 0;
-                
+
                 return {
                     ...budget,
                     spentAmount: spentAmount
@@ -154,7 +174,7 @@ const getBudget = async (req, res, next) => {
         // Calculate spent amount from expenses
         const startDate = new Date(budgetData.startDate);
         const endDate = new Date(budgetData.endDate);
-        
+
         const expenses = await Expense.aggregate([
             {
                 $match: {
@@ -222,9 +242,30 @@ const updateBudget = async (req, res, next) => {
             }
         }
 
+        const {
+            title,
+            allocatedAmount,
+            spentAmount,
+            category,
+            period,
+            startDate,
+            endDate,
+            isActive
+        } = req.body;
+
         const updatedBudget = await Budget.findByIdAndUpdate(
             budgetId,
-            { ...req.body, updatedAt: new Date() },
+            {
+                title,
+                allocatedAmount,
+                spentAmount,
+                category,
+                period,
+                startDate,
+                endDate,
+                isActive,
+                updatedAt: new Date()
+            },
             { new: true, runValidators: true }
         );
 
