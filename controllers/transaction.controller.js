@@ -199,7 +199,6 @@ const editTransaction = async (req, res, next) => {
             return next(ApiError.validationError(validationErrors));
         }
 
-        const { clientid } = req.headers;
         const parentId = req.body.user._id;
         let { amount, date, dis, type, tId } = value;
 
@@ -220,7 +219,7 @@ const editTransaction = async (req, res, next) => {
             }]));
         }
 
-        // Check if transaction exists
+        // Check if transaction exists and get current details for balance recalculation
         const existingTransaction = await Transaction.findOne({
             _id: mongoose.Types.ObjectId(tId),
             parentId
@@ -230,38 +229,46 @@ const editTransaction = async (req, res, next) => {
             return next(ApiError.notFoundError("Transaction not found"));
         }
 
-        // Validate amount
-        if (!validateAmount(amount)) {
-            return next(ApiError.validationError([{
-                field: 'amount',
-                message: 'Invalid amount format',
-                value: amount
-            }]));
+        // Prepare updated fields
+        const updateFields = {};
+        let finalAmount = existingTransaction.amount;
+        let typeChanged = false;
+
+        if (type !== undefined) {
+            updateFields.type = type;
+            typeChanged = true;
+        } else {
+            type = existingTransaction.type;
         }
 
-        // Validate date
-        if (!validateDate(date)) {
-            return next(ApiError.validationError([{
-                field: 'date',
-                message: 'Invalid date format',
-                value: date
-            }]));
+        if (amount !== undefined) {
+            // Handle amount sign based on transaction type
+            let processedAmount = parseFloat(amount);
+            if (type === "OUT" && processedAmount > 0) {
+                processedAmount = -processedAmount;
+            } else if (type === "IN" && processedAmount < 0) {
+                processedAmount = Math.abs(processedAmount);
+            }
+            updateFields.amount = processedAmount;
+            finalAmount = processedAmount;
+        } else if (typeChanged) {
+            // If type changed but amount didn't, we still need to potentially flip the sign
+            let currentAmount = existingTransaction.amount;
+            if (type === "OUT" && currentAmount > 0) {
+                currentAmount = -currentAmount;
+            } else if (type === "IN" && currentAmount < 0) {
+                currentAmount = Math.abs(currentAmount);
+            }
+            updateFields.amount = currentAmount;
+            finalAmount = currentAmount;
         }
 
-        // Validate description length
-        if (!validateStringLength(dis, 1, 500)) {
-            return next(ApiError.validationError([{
-                field: 'dis',
-                message: 'Description must be between 1 and 500 characters',
-                value: dis
-            }]));
+        if (date !== undefined) {
+            updateFields.date = new Date(date);
         }
 
-        // Handle amount sign based on transaction type
-        if (type === "OUT" && amount > 0) {
-            amount = parseFloat(amount) * -1;
-        } else if (type === "IN" && amount < 0) {
-            amount = Math.abs(parseFloat(amount));
+        if (dis !== undefined) {
+            updateFields.dis = dis;
         }
 
         // Update transaction
@@ -270,19 +277,27 @@ const editTransaction = async (req, res, next) => {
                 _id: mongoose.Types.ObjectId(tId),
                 parentId
             },
-            {
-                $set: {
-                    amount: parseFloat(amount),
-                    date: new Date(date),
-                    type,
-                    dis
-                }
-            },
+            { $set: updateFields },
             { new: true }
         );
 
         if (!result) {
-            return next(ApiError.notFoundError("Transaction not found"));
+            return next(ApiError.notFoundError("Transaction not found during update"));
+        }
+
+        // Recalculate client balance if amount or type changed
+        if (amount !== undefined || typeChanged) {
+            const amountDiff = finalAmount - existingTransaction.amount;
+
+            await clients.findByIdAndUpdate(existingTransaction.clientId, {
+                $inc: { totalBalance: amountDiff },
+                lastTransactionDate: new Date()
+            });
+        } else if (date !== undefined) {
+            // Update lastTransactionDate if only date changed
+            await clients.findByIdAndUpdate(existingTransaction.clientId, {
+                lastTransactionDate: new Date()
+            });
         }
 
         return res.status(200).json(
@@ -677,13 +692,13 @@ const getTransactionStatistics = async (req, res, next) => {
         // Build match conditions - exclude hidden transactions and separators
         // Handle both String and ObjectId formats for parentId (for backward compatibility)
         const matchConditions = {
-            $or: parentIdObjectId 
+            $or: parentIdObjectId
                 ? [{ parentId: parentIdString }, { parentId: parentIdObjectId }]
                 : [{ parentId: parentIdString }],
             hidden: { $ne: true }, // Exclude hidden transactions
             isSeparator: { $ne: true } // Exclude separators
         };
-        
+
         if (clientId) {
             // Convert clientId to ObjectId if it's a valid ObjectId string
             try {
@@ -697,7 +712,7 @@ const getTransactionStatistics = async (req, res, next) => {
                 matchConditions.clientId = clientId;
             }
         }
-        
+
         if (startDate || endDate) {
             matchConditions.date = {};
             if (startDate) {
@@ -754,7 +769,7 @@ const getTransactionStatistics = async (req, res, next) => {
         // If no results and we have date filters, try a test query without date filters to debug
         if (stats.length === 0 && (startDate || endDate)) {
             const testMatchConditions = {
-                $or: parentIdObjectId 
+                $or: parentIdObjectId
                     ? [{ parentId: parentIdString }, { parentId: parentIdObjectId }]
                     : [{ parentId: parentIdString }],
                 hidden: { $ne: true },
@@ -799,7 +814,7 @@ const getTransactionStatistics = async (req, res, next) => {
         responseData.debitTransactions = Number(responseData.debitTransactions ?? 0);
         responseData.creditAmount = Number(responseData.creditAmount ?? 0);
         responseData.debitAmount = Number(responseData.debitAmount ?? 0);
-        
+
         console.log('📊 getTransactionStatistics: Final responseData after normalization:', JSON.stringify(responseData, null, 2));
 
         console.log('📊 getTransactionStatistics: Final responseData:', JSON.stringify(responseData, null, 2));

@@ -19,12 +19,14 @@ const createIncome = async (req, res, next) => {
             isActive
         } = req.body;
 
+        const { _id: parentId } = req.body.user;
+
         const incomeData = {
             parentId,
             budgetSectionId,
             title,
             amount,
-            date,
+            date: new Date(date),
             description,
             sourceType,
             notes,
@@ -257,7 +259,7 @@ const updateIncome = async (req, res, next) => {
                 budgetSectionId,
                 title,
                 amount,
-                date,
+                date: date ? new Date(date) : undefined,
                 description,
                 sourceType,
                 notes,

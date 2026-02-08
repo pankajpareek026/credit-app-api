@@ -19,6 +19,8 @@ const createBudget = async (req, res, next) => {
             isActive
         } = req.body;
 
+        const { _id: parentId } = req.body.user;
+
         const budgetData = {
             parentId,
             title,
@@ -26,8 +28,8 @@ const createBudget = async (req, res, next) => {
             spentAmount,
             category,
             period,
-            startDate,
-            endDate,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
             isActive
         };
 
@@ -261,8 +263,8 @@ const updateBudget = async (req, res, next) => {
                 spentAmount,
                 category,
                 period,
-                startDate,
-                endDate,
+                startDate: new Date(startDate),
+                endDate: new Date(endDate),
                 isActive,
                 updatedAt: new Date()
             },

@@ -19,12 +19,14 @@ const createBudgetSection = async (req, res, next) => {
             isActive
         } = req.body;
 
+        const { _id: parentId } = req.body.user;
+
         const budgetSectionData = {
             parentId,
             title,
             description,
-            startDate,
-            endDate,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
             targetBudget,
             isActive
         };
@@ -401,8 +403,8 @@ const updateBudgetSection = async (req, res, next) => {
             {
                 title,
                 description,
-                startDate,
-                endDate,
+                startDate: new Date(startDate),
+                endDate: new Date(endDate),
                 targetBudget,
                 isActive,
                 updatedAt: new Date()

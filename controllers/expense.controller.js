@@ -227,7 +227,7 @@ const updateExpense = async (req, res, next) => {
             {
                 title,
                 amount,
-                date,
+                date: date ? new Date(date) : undefined,
                 category,
                 paymentMethod,
                 tags,

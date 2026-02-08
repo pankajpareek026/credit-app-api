@@ -252,35 +252,31 @@ const transactionSchemas = {
             }),
         amount: Joi.number()
             .positive()
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Amount must be a valid number',
-                'number.positive': 'Amount must be positive',
-                'any.required': 'Amount is required'
+                'number.positive': 'Amount must be positive'
             }),
         date: Joi.date()
             .max('now')
-            .required()
+            .optional()
             .messages({
                 'date.base': 'Date must be a valid date',
-                'date.max': 'Transaction date cannot be in the future',
-                'any.required': 'Date is required'
+                'date.max': 'Transaction date cannot be in the future'
             }),
         dis: Joi.string()
             .min(1)
             .max(500)
-            .required()
+            .optional()
             .messages({
                 'string.min': 'Description must not be empty',
-                'string.max': 'Description must not exceed 500 characters',
-                'any.required': 'Description is required'
+                'string.max': 'Description must not exceed 500 characters'
             }),
         type: Joi.string()
             .valid('IN', 'OUT')
-            .required()
+            .optional()
             .messages({
-                'any.only': 'Type must be either IN or OUT',
-                'any.required': 'Type is required'
+                'any.only': 'Type must be either IN or OUT'
             })
     }),
 
