@@ -227,7 +227,7 @@ const getBudgetSection = async (req, res, next) => {
             }
         ]);
 
-        const totalIncome = incomeResult.length > 0 ? incomeResult[0].total : 0;
+        const totalIncome = incomeResult.length > 0 ? Number(incomeResult[0].total || 0) : 0;
 
         // Calculate total expenses
         const expenseResult = await Expense.aggregate([
@@ -246,10 +246,10 @@ const getBudgetSection = async (req, res, next) => {
             }
         ]);
 
-        const totalExpenses = expenseResult.length > 0 ? expenseResult[0].total : 0;
+        const totalExpenses = expenseResult.length > 0 ? Number(expenseResult[0].total || 0) : 0;
 
         // Calculate balance (can be negative)
-        const balance = totalIncome - totalExpenses;
+        const balance = Number(totalIncome) - Number(totalExpenses);
 
         // Get income entries
         const incomes = await Income.find({
