@@ -23,21 +23,21 @@ const createRateLimiter = (windowMs, max, message) => {
 // General API rate limiter
 const apiLimiter = createRateLimiter(
     15 * 60 * 1000, // 15 minutes
-    100, // limit each IP to 100 requests per windowMs
+    3000, // limit each IP to 3000 requests per windowMs (relaxed for dev)
     'Too many API requests from this IP, please try again later.'
 );
 
-// Auth endpoints rate limiter (stricter)
+// Auth endpoints rate limiter
 const authLimiter = createRateLimiter(
     15 * 60 * 1000, // 15 minutes
-    5, // limit each IP to 5 requests per windowMs
+    100, // limit each IP to 100 requests per windowMs (relaxed for dev)
     'Too many authentication attempts from this IP, please try again later.'
 );
 
-// Notes/Vault endpoints rate limiter (stricter for sensitive data)
+// Notes/Vault endpoints rate limiter
 const sensitiveDataLimiter = createRateLimiter(
     15 * 60 * 1000, // 15 minutes
-    50, // limit each IP to 50 requests per windowMs
+    500, // limit each IP to 500 requests per windowMs (relaxed for dev)
     'Too many requests to sensitive data endpoints, please try again later.'
 );
 
@@ -46,7 +46,7 @@ const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         const allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:8080',
@@ -55,7 +55,7 @@ const corsOptions = {
             'https://yourdomain.com', // Add your production domain
             'https://www.yourdomain.com'
         ];
-        
+
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -114,7 +114,7 @@ const validateInput = (req, res, next) => {
 // Request logging middleware
 const requestLogger = (req, res, next) => {
     const start = Date.now();
-    
+
     res.on('finish', () => {
         const duration = Date.now() - start;
         const logData = {
@@ -127,7 +127,7 @@ const requestLogger = (req, res, next) => {
             ip: req.ip || req.connection.remoteAddress,
             userId: req.body?.user?._id || 'anonymous'
         };
-        
+
         // Log based on status code
         if (res.statusCode >= 400) {
             console.error('API Error:', logData);
@@ -135,7 +135,7 @@ const requestLogger = (req, res, next) => {
             console.log('API Request:', logData);
         }
     });
-    
+
     next();
 };
 
@@ -154,7 +154,7 @@ const errorLogger = (err, req, res, next) => {
         ip: req.ip || req.connection.remoteAddress,
         userId: req.body?.user?._id || 'anonymous'
     };
-    
+
     console.error('API Error:', errorLog);
     next(err);
 };
@@ -163,7 +163,7 @@ const errorLogger = (err, req, res, next) => {
 const requestSizeLimiter = (req, res, next) => {
     const contentLength = parseInt(req.get('Content-Length') || '0');
     const maxSize = 10 * 1024 * 1024; // 10MB
-    
+
     if (contentLength > maxSize) {
         return res.status(413).json({
             success: false,
@@ -171,14 +171,14 @@ const requestSizeLimiter = (req, res, next) => {
             statusCode: 413
         });
     }
-    
+
     next();
 };
 
 // API key validation middleware (for future use)
 const validateApiKey = (req, res, next) => {
     const apiKey = req.headers['x-api-key'];
-    
+
     // For now, we'll skip API key validation
     // In production, implement proper API key validation
     if (false && !apiKey) {
@@ -188,7 +188,7 @@ const validateApiKey = (req, res, next) => {
             statusCode: 401
         });
     }
-    
+
     next();
 };
 
@@ -203,33 +203,33 @@ const validateSession = (req, res, next) => {
 const applySecurityMiddleware = (app) => {
     // Basic security headers
     app.use(securityHeaders);
-    
+
     // CORS
     app.use(cors(corsOptions));
-    
+
     // Request parsing limits
     app.use(requestSizeLimiter);
-    
+
     // Input sanitization
     app.use(mongoSanitize()); // Prevent NoSQL injection
     app.use(xss()); // Prevent XSS attacks
     app.use(hpp()); // Prevent HTTP Parameter Pollution
-    
+
     // Input validation
     app.use(validateInput);
-    
+
     // Request logging
     app.use(requestLogger);
-    
+
     // Error logging
     app.use(errorLogger);
-    
+
     // API key validation (optional)
     app.use(validateApiKey);
-    
+
     // Session validation (optional)
     app.use(validateSession);
-    
+
     // Apply rate limiting to specific routes
     app.use('/api/auth', authLimiter);
     app.use('/api/notes', sensitiveDataLimiter);

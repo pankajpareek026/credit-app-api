@@ -22,7 +22,7 @@ const createBudgetSection = async (req, res, next) => {
         }
 
         const newBudgetSection = await BudgetSection.create(budgetSectionData);
-        
+
         return res.status(201).json(
             ApiResponse.created(newBudgetSection, "Budget section created successfully")
         );
@@ -39,10 +39,10 @@ const getAllBudgetSections = async (req, res, next) => {
     try {
         const { _id: parentIdRaw } = req.body.user;
         // Convert parentId to ObjectId to ensure proper matching
-        const parentId = mongoose.Types.ObjectId.isValid(parentIdRaw) 
-            ? new mongoose.Types.ObjectId(parentIdRaw) 
+        const parentId = mongoose.Types.ObjectId.isValid(parentIdRaw)
+            ? new mongoose.Types.ObjectId(parentIdRaw)
             : parentIdRaw;
-        
+
         const {
             page = 1,
             limit = 20,
@@ -83,12 +83,12 @@ const getAllBudgetSections = async (req, res, next) => {
         const sectionsWithBalance = await Promise.all(
             sections.map(async (section) => {
                 const sectionId = section._id;
-                
+
                 // Ensure sectionId is ObjectId for proper matching
-                const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId) 
-                    ? new mongoose.Types.ObjectId(sectionId) 
+                const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId)
+                    ? new mongoose.Types.ObjectId(sectionId)
                     : sectionId;
-                
+
                 // Calculate total income
                 const incomeResult = await Income.aggregate([
                     {
@@ -108,11 +108,11 @@ const getAllBudgetSections = async (req, res, next) => {
                 ]);
 
                 // Explicitly convert to numbers to ensure proper serialization
-                const totalIncome = incomeResult.length > 0 
-                    ? Number(incomeResult[0].total || 0) 
+                const totalIncome = incomeResult.length > 0
+                    ? Number(incomeResult[0].total || 0)
                     : 0;
-                const incomeCount = incomeResult.length > 0 
-                    ? Number(incomeResult[0].count || 0) 
+                const incomeCount = incomeResult.length > 0
+                    ? Number(incomeResult[0].count || 0)
                     : 0;
 
                 // Calculate total expenses
@@ -133,11 +133,11 @@ const getAllBudgetSections = async (req, res, next) => {
                     }
                 ]);
 
-                const totalExpenses = expenseResult.length > 0 
-                    ? Number(expenseResult[0].total || 0) 
+                const totalExpenses = expenseResult.length > 0
+                    ? Number(expenseResult[0].total || 0)
                     : 0;
-                const expenseCount = expenseResult.length > 0 
-                    ? Number(expenseResult[0].count || 0) 
+                const expenseCount = expenseResult.length > 0
+                    ? Number(expenseResult[0].count || 0)
                     : 0;
 
                 // Calculate balance (can be negative)
@@ -202,12 +202,20 @@ const getBudgetSection = async (req, res, next) => {
             return next(ApiError.notFoundError('Budget section not found'));
         }
 
+        // Ensure IDs are ObjectIds for aggregation
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId)
+            ? new mongoose.Types.ObjectId(parentId)
+            : parentId;
+        const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId)
+            ? new mongoose.Types.ObjectId(sectionId)
+            : sectionId;
+
         // Calculate total income
         const incomeResult = await Income.aggregate([
             {
                 $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
+                    parentId: parentObjectId,
+                    budgetSectionId: sectionObjectId,
                     isActive: true
                 }
             },
@@ -225,8 +233,8 @@ const getBudgetSection = async (req, res, next) => {
         const expenseResult = await Expense.aggregate([
             {
                 $match: {
-                    parentId: parentId,
-                    budgetSectionId: sectionData._id,
+                    parentId: parentObjectId,
+                    budgetSectionId: sectionObjectId,
                     isActive: true
                 }
             },
@@ -245,15 +253,15 @@ const getBudgetSection = async (req, res, next) => {
 
         // Get income entries
         const incomes = await Income.find({
-            parentId: parentId,
-            budgetSectionId: sectionData._id,
+            parentId: parentObjectId,
+            budgetSectionId: sectionObjectId,
             isActive: true
         }).sort({ date: -1 }).lean();
 
         // Get expense entries
         const expenses = await Expense.find({
-            parentId: parentId,
-            budgetSectionId: sectionData._id,
+            parentId: parentObjectId,
+            budgetSectionId: sectionObjectId,
             isActive: true
         }).sort({ date: -1 }).lean();
 
@@ -315,10 +323,67 @@ const updateBudgetSection = async (req, res, next) => {
             sectionId,
             { ...req.body, updatedAt: new Date() },
             { new: true, runValidators: true }
-        );
+        ).lean();
+
+        // Ensure IDs are ObjectIds for aggregation
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId)
+            ? new mongoose.Types.ObjectId(parentId)
+            : parentId;
+        const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId)
+            ? new mongoose.Types.ObjectId(sectionId)
+            : sectionId;
+
+        // Calculate total income
+        const incomeResult = await Income.aggregate([
+            {
+                $match: {
+                    parentId: parentObjectId,
+                    budgetSectionId: sectionObjectId,
+                    isActive: true
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        const totalIncome = incomeResult.length > 0 ? Number(incomeResult[0].total || 0) : 0;
+
+        // Calculate total expenses
+        const expenseResult = await Expense.aggregate([
+            {
+                $match: {
+                    parentId: parentObjectId,
+                    budgetSectionId: sectionObjectId,
+                    isActive: true
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: '$amount' }
+                }
+            }
+        ]);
+
+        const totalExpenses = expenseResult.length > 0 ? Number(expenseResult[0].total || 0) : 0;
+
+        // Calculate balance
+        const balance = Number(totalIncome) - Number(totalExpenses);
+
+        // Return section with calculated totals
+        const sectionWithTotals = {
+            ...updatedSection,
+            totalIncome: Number(totalIncome),
+            totalExpenses: Number(totalExpenses),
+            balance: Number(balance)
+        };
 
         return res.status(200).json(
-            ApiResponse.updated(updatedSection, "Budget section updated successfully")
+            ApiResponse.updated(sectionWithTotals, "Budget section updated successfully")
         );
     } catch (error) {
         console.error('Update budget section error:', error);
@@ -366,10 +431,18 @@ const getBudgetSectionStatistics = async (req, res, next) => {
             return next(ApiError.notFoundError('Budget section not found'));
         }
 
+        // Ensure IDs are ObjectIds for aggregation
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId)
+            ? new mongoose.Types.ObjectId(parentId)
+            : parentId;
+        const sectionObjectId = mongoose.Types.ObjectId.isValid(sectionId)
+            ? new mongoose.Types.ObjectId(sectionId)
+            : sectionId;
+
         // Build base filter
         const baseFilter = {
-            parentId: parentId,
-            budgetSectionId: sectionData._id,
+            parentId: parentObjectId,
+            budgetSectionId: sectionObjectId,
             isActive: true
         };
 
@@ -559,8 +632,8 @@ const getBudgetSectionStatistics = async (req, res, next) => {
             incomeSourceBreakdown,
             expenseCategoryBreakdown,
             targetBudget: sectionData.targetBudget || null,
-            balancePercentage: sectionData.targetBudget 
-                ? (balance / sectionData.targetBudget) * 100 
+            balancePercentage: sectionData.targetBudget
+                ? (balance / sectionData.targetBudget) * 100
                 : null
         };
 
