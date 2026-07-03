@@ -112,6 +112,12 @@ const newTransaction = async (req, res, next) => {
             return next(ApiError.internalError('Failed to create transaction'));
         }
 
+        // Update client balance
+        await clients.findByIdAndUpdate(clientId, {
+            $inc: { totalBalance: parseFloat(amount) },
+            lastTransactionDate: new Date()
+        });
+
         return res.status(201).json(
             ApiResponse.created(result, 'Transaction saved successfully!')
         );
@@ -455,7 +461,12 @@ const allTransactions = async (req, res, next) => {
                                             tId: "$$trans._id",
                                             date: "$$trans.date",
                                             dis: "$$trans.dis",
-                                            type: "$$trans.type"
+                                            type: "$$trans.type",
+                                            hidden: { $ifNull: ["$$trans.hidden", false] },
+                                            isSeparator: { $ifNull: ["$$trans.isSeparator", false] },
+                                            separator: "$$trans.separator",
+                                            position: { $ifNull: ["$$trans.position", 0] },
+                                            attachments: { $ifNull: ["$$trans.attachments", []] }
                                         },
                                         else: null
                                     }
