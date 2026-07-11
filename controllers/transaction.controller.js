@@ -402,8 +402,18 @@ const allTransactions = async (req, res, next) => {
     try {
         const clientId = req.headers.clientid
         const parentId = req.body.user._id;
-        if (!clientId || !parentId) {
-            return next(new ApiError(401, "Invalid user"))
+        // `parentId` missing genuinely means the auth middleware didn't
+        // populate a user - that's a real 401. `clientId` missing just
+        // means the request didn't include the header - a client bug, not
+        // an auth failure. These used to share one 401, which meant a
+        // missing clientid header (e.g. from stale/incomplete transaction
+        // data client-side) would trigger the app's session-expiry
+        // handling and log the user out for no auth-related reason.
+        if (!parentId) {
+            return next(ApiError.authenticationError("Unauthorized user"));
+        }
+        if (!clientId) {
+            return next(ApiError.badRequestError("Client ID is required"));
         }
 
         // 
@@ -459,6 +469,11 @@ const allTransactions = async (req, res, next) => {
                                         then: {
                                             amount: "$$trans.amount",
                                             tId: "$$trans._id",
+                                            // Was missing entirely - every transaction row silently had no
+                                            // clientId, so any client code reading it back (e.g. re-loading
+                                            // the list after an edit, using the clientId off the last-loaded
+                                            // transaction) got an empty string instead of the real ID.
+                                            clientId: "$doc._id",
                                             date: "$$trans.date",
                                             dis: "$$trans.dis",
                                             type: "$$trans.type",
