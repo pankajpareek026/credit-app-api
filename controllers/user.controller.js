@@ -272,7 +272,7 @@ const profile = async (req, res, next) => {
             return next(new ApiError(404, "User not found"));
         }
 
-        const { name, email } = userData
+        const { name, email, hideTotalBalance } = userData
         console.log("🔍 User Profile - Name: " + name + ", Email: " + email)
 
         // console.log(`req recived  name=>${name} , _ID=>${_id} `)
@@ -294,6 +294,7 @@ const profile = async (req, res, next) => {
                 name: name,
                 email: email,
                 symbol: name.charAt(0),
+                hideTotalBalance: !!hideTotalBalance,
                 allClients: allClients,
                 allSharedLinks: allSharedLinks
             })
@@ -301,6 +302,53 @@ const profile = async (req, res, next) => {
     } catch (error) {
         console.error("🔍 User Profile - Error:", error.message);
         return next(new ApiError(500, error.message));
+    }
+}
+
+/**
+ * PATCH /api/auth/settings
+ *
+ * Persists per-user app settings (currently just `hideTotalBalance`, the
+ * dashboard's "hide total balance" privacy toggle) to the user document,
+ * so a preference changed on one device is picked up by every other
+ * device the same account logs into via GET /api/auth/userProfile.
+ *
+ * `_id` comes from `req.body.user`, which the `authy` middleware populates
+ * from the decoded JWT (see auth.middleware.js) - the same pattern the
+ * `profile` handler above uses. We re-fetch/update the user by that `_id`
+ * in Mongo rather than trusting any `hideTotalBalance` baked into the JWT
+ * at login time, since the JWT payload is only as fresh as the last login
+ * and would otherwise go stale the moment the setting changes.
+ */
+const updateSettings = async (req, res, next) => {
+    try {
+        const { _id } = req.body.user
+        const { hideTotalBalance } = req.body
+
+        if (typeof hideTotalBalance !== 'boolean') {
+            return next(ApiError.validationError([{
+                field: 'hideTotalBalance',
+                message: 'hideTotalBalance must be a boolean',
+                value: hideTotalBalance
+            }]));
+        }
+
+        const updatedUser = await user.findByIdAndUpdate(
+            _id,
+            { hideTotalBalance },
+            { new: true } // return the post-update document so we can echo back the persisted value
+        ).select('-pass -token');
+
+        if (!updatedUser) {
+            return next(ApiError.notFoundError('User not found'));
+        }
+
+        return res.status(200).json(
+            ApiResponse.updated({ hideTotalBalance: updatedUser.hideTotalBalance }, 'Settings updated successfully')
+        )
+    } catch (error) {
+        console.error('Update settings error:', error);
+        return next(ApiError.internalError('Failed to update settings'));
     }
 }
 
@@ -618,6 +666,7 @@ module.exports = {
     login,
     profile,
     logout,
+    updateSettings,
     verifyPasswordForPinReset,
     resetPin,
     promoteToAdmin,

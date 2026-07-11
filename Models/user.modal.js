@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    // Dashboard "hide total balance" privacy toggle. Persisted here (rather
+    // than only on-device) so the preference is the same across every
+    // device the user logs into - see updateSettings/profile below in
+    // user.controller.js for the sync endpoints (GET/PATCH /api/auth).
+    hideTotalBalance: {
+        type: Boolean,
+        default: false
+    },
     // Admin role and permissions
     isAdmin: {
         type: Boolean,

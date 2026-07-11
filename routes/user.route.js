@@ -3,6 +3,7 @@ const {
     register,
     logout,
     profile,
+    updateSettings,
     verifyPasswordForPinReset,
     resetPin,
     promoteToAdmin,
@@ -26,6 +27,10 @@ router.route("/login").post(login)
 router.route("/register").post(register)
 router.route("/logout").post(authy, logout)
 router.route("/userProfile").get(authy, profile)
+
+// Per-user app settings (e.g. dashboard "hide total balance" toggle) -
+// persisted server-side so the preference syncs across devices.
+router.route("/settings").patch(authy, updateSettings)
 
 // OTP routes
 router.route("/request-otp").post(requestOtp)
