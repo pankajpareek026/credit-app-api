@@ -250,12 +250,22 @@ const transactionSchemas = {
             .messages({
                 'any.required': 'Transaction ID is required'
             }),
+        // Unlike `create`, this does NOT require a positive amount: the
+        // controller's sign-normalization logic (see editTransaction in
+        // transaction.controller.js) already tolerates an amount arriving
+        // either signed or unsigned - it only flips the sign when it
+        // doesn't already match `type`, so a correctly-negative OUT amount
+        // passes through unchanged. Requiring `.positive()` here used to
+        // reject that case outright before the controller ever got a
+        // chance to handle it, breaking every edit of a debit transaction
+        // where the amount was sent already negative. Only an exact zero
+        // is rejected, since a zero-amount transaction is never valid.
         amount: Joi.number()
-            .positive()
+            .invalid(0)
             .optional()
             .messages({
                 'number.base': 'Amount must be a valid number',
-                'number.positive': 'Amount must be positive'
+                'any.invalid': 'Amount cannot be zero'
             }),
         date: Joi.date()
             .max('now')
