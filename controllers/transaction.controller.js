@@ -572,7 +572,11 @@ const getTransactionDetails = async (req, res, next) => {
             description: transaction.dis,
             type: transaction.type,
             createdAt: transaction.createdAt,
-            updatedAt: transaction.updatedAt
+            updatedAt: transaction.updatedAt,
+            // Previously uploaded receipts/images live here - without this,
+            // the details view has no way to know they exist even though
+            // they're already persisted on the transaction document.
+            attachments: transaction.attachments
         };
 
 
