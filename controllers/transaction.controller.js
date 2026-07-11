@@ -912,11 +912,22 @@ const uploadTransactionAttachment = async (req, res, next) => {
             parentId
         });
 
+        // The installed multer-storage-cloudinary version (4.0.0 - confirmed by
+        // reading its actual _handleFile implementation) only ever calls back
+        // with `{ path: resp.secure_url, size: resp.bytes, filename: resp.public_id }`.
+        // It never sets req.file.public_id/secure_url/url - those are from an
+        // older/different version's convention. Reading those non-existent
+        // fields meant every attachment object below was missing its required
+        // publicId/secureUrl/url, so Transaction.findByIdAndUpdate's schema
+        // validation threw on every single upload (reported as a generic 500).
+        const cloudinaryPublicId = req.file.filename;
+        const cloudinarySecureUrl = req.file.path;
+
         if (!transaction) {
             // Clean up uploaded file from Cloudinary if transaction doesn't exist
-            if (req.file.public_id) {
+            if (cloudinaryPublicId) {
                 try {
-                    await deleteFromCloudinary(req.file.public_id);
+                    await deleteFromCloudinary(cloudinaryPublicId);
                 } catch (deleteError) {
                     console.error("Error cleaning up file from Cloudinary:", deleteError.message);
                 }
@@ -930,10 +941,13 @@ const uploadTransactionAttachment = async (req, res, next) => {
             originalName: req.file.originalname,
             mimetype: req.file.mimetype,
             size: req.file.size,
-            publicId: req.file.public_id,
-            secureUrl: req.file.secure_url,
-            url: req.file.url,
-            path: req.file.path || req.file.secure_url, // Fallback for backward compatibility
+            publicId: cloudinaryPublicId,
+            secureUrl: cloudinarySecureUrl,
+            // This library version doesn't expose a separate non-secure URL -
+            // reuse the (always-HTTPS) secure one rather than leaving this
+            // required field undefined.
+            url: cloudinarySecureUrl,
+            path: cloudinarySecureUrl,
             uploadedAt: new Date()
         };
 
@@ -954,10 +968,14 @@ const uploadTransactionAttachment = async (req, res, next) => {
     } catch (error) {
         console.error("Error in uploadTransactionAttachment:", error.message);
 
-        // Clean up uploaded file from Cloudinary on error
-        if (req.file && req.file.public_id) {
+        // Clean up uploaded file from Cloudinary on error. req.file.filename
+        // is where this storage engine version puts the Cloudinary public_id
+        // (see comment above) - req.file.public_id is never set and this
+        // cleanup silently never ran before, leaking orphaned files in
+        // Cloudinary on every failed upload.
+        if (req.file && req.file.filename) {
             try {
-                await deleteFromCloudinary(req.file.public_id);
+                await deleteFromCloudinary(req.file.filename);
             } catch (deleteError) {
                 console.error("Error cleaning up file from Cloudinary:", deleteError.message);
             }
