@@ -26,13 +26,7 @@ const budgetSectionSchema = new mongoose.Schema({
     endDate: {
         type: Date,
         required: true,
-        index: true,
-        validate: {
-            validator: function(value) {
-                return value > this.startDate;
-            },
-            message: 'End date must be after start date'
-        }
+        index: true
     },
     targetBudget: {
         type: Number,
