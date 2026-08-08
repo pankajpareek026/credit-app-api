@@ -68,6 +68,40 @@ const uploadSingle = upload.single('attachment');
 // Middleware for multiple file uploads
 const uploadMultiple = upload.array('attachments', 5);
 
+// Separate storage/upload config for APK distribution, kept independent
+// from the transaction-attachment config above (different folder, resource
+// type, file type, and size limit).
+const apkStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: process.env.CLOUDINARY_APK_FOLDER || 'credit-app/releases',
+        resource_type: 'raw',
+        allowed_formats: ['apk'],
+        use_filename: true,
+        unique_filename: true,
+    },
+});
+
+const apkFileFilter = (req, file, cb) => {
+    if (file.originalname.toLowerCase().endsWith('.apk')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type. Only APK files are allowed.'), false);
+    }
+};
+
+const apkUpload = multer({
+    storage: apkStorage,
+    fileFilter: apkFileFilter,
+    limits: {
+        fileSize: 150 * 1024 * 1024, // 150MB limit
+        files: 1
+    }
+});
+
+// Middleware for single APK upload
+const uploadApk = apkUpload.single('apk');
+
 // Error handling middleware
 const handleUploadError = (error, req, res, next) => {
     if (error instanceof multer.MulterError) {
@@ -130,6 +164,7 @@ const getFileInfo = async (publicId) => {
 module.exports = {
     uploadSingle,
     uploadMultiple,
+    uploadApk,
     handleUploadError,
     deleteFromCloudinary,
     getFileInfo,
