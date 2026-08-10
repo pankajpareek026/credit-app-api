@@ -76,11 +76,11 @@ const clientSchemas = {
     create: Joi.object({
         name: Joi.string()
             .min(2)
-            .max(15)
+            .max(45)
             .required()
             .messages({
                 'string.min': 'Client name must be at least 2 characters long',
-                'string.max': 'Client name must not exceed 15 characters',
+                'string.max': 'Client name must not exceed 45 characters',
                 'any.required': 'Client name is required'
             }),
         phoneNumber: Joi.string()
