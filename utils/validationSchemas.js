@@ -1037,6 +1037,11 @@ const expenseSchemas = {
             .optional()
             .messages({
                 'string.base': 'Budget section ID must be a string'
+            }),
+        clientId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
             })
     }),
 
@@ -1101,6 +1106,12 @@ const expenseSchemas = {
             .messages({
                 'string.base': 'Budget section ID must be a string'
             }),
+        clientId: Joi.string()
+            .allow(null, '')
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
+            }),
         isActive: Joi.boolean()
             .optional()
             .messages({
@@ -1142,6 +1153,11 @@ const expenseSchemas = {
             .optional()
             .messages({
                 'string.base': 'Budget section ID must be a string'
+            }),
+        clientId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
             }),
         category: Joi.string()
             .valid('FOOD', 'TRANSPORT', 'BILLS', 'ENTERTAINMENT', 'HEALTH', 'SHOPPING', 'EDUCATION', 'INVESTMENT', 'OTHER')
@@ -2132,6 +2148,11 @@ const incomeSchemas = {
             .messages({
                 'string.max': 'Notes must not exceed 1000 characters'
             }),
+        clientId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
+            }),
         isActive: Joi.boolean()
             .default(true)
             .optional()
@@ -2190,6 +2211,12 @@ const incomeSchemas = {
             .messages({
                 'string.max': 'Notes must not exceed 1000 characters'
             }),
+        clientId: Joi.string()
+            .allow(null, '')
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
+            }),
         isActive: Joi.boolean()
             .optional()
             .messages({
@@ -2231,6 +2258,11 @@ const incomeSchemas = {
             .optional()
             .messages({
                 'string.base': 'Budget section ID must be a string'
+            }),
+        clientId: Joi.string()
+            .optional()
+            .messages({
+                'string.base': 'Client ID must be a string'
             }),
         sourceType: Joi.string()
             .valid('SALARY', 'GIFT', 'SAVINGS', 'LOAN', 'OTHER')

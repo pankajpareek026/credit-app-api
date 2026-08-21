@@ -1,4 +1,5 @@
 const expense = require('../Models/expense.modal');
+const Client = require('../Models/client.modal');
 const ApiError = require('../utils/apiError.utils');
 const ApiResponse = require('../utils/apiResponse.utils');
 
@@ -23,6 +24,7 @@ const createExpense = async (req, res, next) => {
             category,
             paymentMethod,
             budgetSectionId,
+            clientId,
             tags,
             notes,
             isActive
@@ -51,6 +53,15 @@ const createExpense = async (req, res, next) => {
         // Only include budgetSectionId if it's provided (optional field)
         if (budgetSectionId) {
             expenseData.budgetSectionId = budgetSectionId;
+        }
+
+        // Only include clientId if it's provided, and only if it belongs to this user
+        if (clientId) {
+            const client = await Client.findOne({ _id: clientId, parentId, isActive: true });
+            if (!client) {
+                return next(ApiError.notFoundError('Client not found'));
+            }
+            expenseData.clientId = clientId;
         }
 
         // Only include notes if it's provided and not empty
@@ -97,6 +108,7 @@ const getAllExpenses = async (req, res, next) => {
             category,
             paymentMethod,
             budgetSectionId,
+            clientId,
             isActive = true,
             startDate,
             endDate,
@@ -125,6 +137,10 @@ const getAllExpenses = async (req, res, next) => {
 
         if (budgetSectionId) {
             filter.budgetSectionId = budgetSectionId;
+        }
+
+        if (clientId) {
+            filter.clientId = clientId;
         }
 
         if (startDate || endDate) {
@@ -219,8 +235,17 @@ const updateExpense = async (req, res, next) => {
             tags,
             notes,
             budgetSectionId,
+            clientId,
             isActive
         } = req.body;
+
+        // If clientId is being updated, validate it belongs to this user
+        if (clientId) {
+            const client = await Client.findOne({ _id: clientId, parentId, isActive: true });
+            if (!client) {
+                return next(ApiError.notFoundError('Client not found'));
+            }
+        }
 
         const updatedExpense = await expense.findByIdAndUpdate(
             expenseId,
@@ -233,6 +258,7 @@ const updateExpense = async (req, res, next) => {
                 tags,
                 notes,
                 budgetSectionId,
+                clientId,
                 isActive,
                 updatedAt: new Date()
             },

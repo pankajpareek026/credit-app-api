@@ -1,5 +1,6 @@
 const Income = require('../Models/income.modal');
 const BudgetSection = require('../Models/budgetSection.modal');
+const Client = require('../Models/client.modal');
 const ApiError = require('../utils/apiError.utils');
 const ApiResponse = require('../utils/apiResponse.utils');
 
@@ -16,6 +17,7 @@ const createIncome = async (req, res, next) => {
             description,
             sourceType,
             notes,
+            clientId,
             isActive
         } = req.body;
 
@@ -42,6 +44,15 @@ const createIncome = async (req, res, next) => {
 
         if (!budgetSection) {
             return next(ApiError.notFoundError('Budget section not found or inactive'));
+        }
+
+        // Only include clientId if it's provided, and only if it belongs to this user
+        if (clientId) {
+            const client = await Client.findOne({ _id: clientId, parentId, isActive: true });
+            if (!client) {
+                return next(ApiError.notFoundError('Client not found'));
+            }
+            incomeData.clientId = clientId;
         }
 
         // Validate description is provided and meets minimum length
@@ -82,6 +93,7 @@ const getAllIncomes = async (req, res, next) => {
             search,
             budgetSectionId,
             sourceType,
+            clientId,
             isActive = true,
             startDate,
             endDate,
@@ -94,6 +106,10 @@ const getAllIncomes = async (req, res, next) => {
 
         if (budgetSectionId) {
             filter.budgetSectionId = budgetSectionId;
+        }
+
+        if (clientId) {
+            filter.clientId = clientId;
         }
 
         if (sourceType) {
@@ -242,6 +258,14 @@ const updateIncome = async (req, res, next) => {
             }
         }
 
+        // If clientId is being updated, validate it belongs to this user
+        if (req.body.clientId) {
+            const client = await Client.findOne({ _id: req.body.clientId, parentId, isActive: true });
+            if (!client) {
+                return next(ApiError.notFoundError('Client not found'));
+            }
+        }
+
         const {
             budgetSectionId,
             title,
@@ -250,6 +274,7 @@ const updateIncome = async (req, res, next) => {
             description,
             sourceType,
             notes,
+            clientId,
             isActive
         } = req.body;
 
@@ -263,6 +288,7 @@ const updateIncome = async (req, res, next) => {
                 description,
                 sourceType,
                 notes,
+                clientId,
                 isActive,
                 updatedAt: new Date()
             },

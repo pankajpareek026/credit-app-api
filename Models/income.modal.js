@@ -47,6 +47,11 @@ const incomeSchema = new mongoose.Schema({
         trim: true,
         maxlength: 1000
     },
+    clientId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'clients',
+        index: true
+    },
     isActive: {
         type: Boolean,
         default: true,
@@ -62,6 +67,7 @@ incomeSchema.index({ parentId: 1, date: -1 });
 incomeSchema.index({ parentId: 1, sourceType: 1 });
 incomeSchema.index({ parentId: 1, isActive: 1 });
 incomeSchema.index({ budgetSectionId: 1, isActive: 1 });
+incomeSchema.index({ clientId: 1, isActive: 1 });
 
 // Virtual for formatted amount
 incomeSchema.virtual('formattedAmount').get(function() {
