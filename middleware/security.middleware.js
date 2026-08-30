@@ -160,9 +160,16 @@ const errorLogger = (err, req, res, next) => {
 };
 
 // Request size limiter
+// APK releases are uploaded through this same global limiter, so that one
+// release-key-gated endpoint gets a higher ceiling (matches the multer
+// fileSize limit in cloudinary_upload.js); everything else stays at 10MB.
 const requestSizeLimiter = (req, res, next) => {
     const contentLength = parseInt(req.get('Content-Length') || '0');
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const defaultMaxSize = 10 * 1024 * 1024; // 10MB
+    const apkUploadMaxSize = 150 * 1024 * 1024; // 150MB
+
+    const isApkUpload = req.path === '/api/app/upload-apk';
+    const maxSize = isApkUpload ? apkUploadMaxSize : defaultMaxSize;
 
     if (contentLength > maxSize) {
         return res.status(413).json({
