@@ -2,6 +2,7 @@ const expense = require('../Models/expense.modal');
 const Client = require('../Models/client.modal');
 const ApiError = require('../utils/apiError.utils');
 const ApiResponse = require('../utils/apiResponse.utils');
+const { syncClientTransaction, deleteLinkedTransaction } = require('../utils/clientTransactionSync');
 
 /**
  * Create a new expense
@@ -70,6 +71,20 @@ const createExpense = async (req, res, next) => {
         }
 
         const newExpense = await expense.create(expenseData);
+
+        // If linked to a client, mirror this expense as an OUT transaction in the client's ledger
+        if (newExpense.clientId) {
+            newExpense.linkedTransactionId = await syncClientTransaction({
+                linkedTransactionId: null,
+                clientId: newExpense.clientId,
+                parentId,
+                amount: newExpense.amount,
+                date: newExpense.date,
+                description: newExpense.title,
+                type: 'OUT'
+            });
+            await newExpense.save();
+        }
 
         return res.status(201).json(
             ApiResponse.created(newExpense, "Expense created successfully")
@@ -240,6 +255,7 @@ const updateExpense = async (req, res, next) => {
         } = req.body;
 
         // If clientId is being updated, validate it belongs to this user
+        const clientIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'clientId');
         if (clientId) {
             const client = await Client.findOne({ _id: clientId, parentId, isActive: true });
             if (!client) {
@@ -247,23 +263,55 @@ const updateExpense = async (req, res, next) => {
             }
         }
 
+        const setFields = {
+            title,
+            amount,
+            date: date ? new Date(date) : undefined,
+            category,
+            paymentMethod,
+            tags,
+            notes,
+            budgetSectionId,
+            isActive,
+            updatedAt: new Date()
+        };
+
+        const updateQuery = { $set: setFields };
+        if (clientIdProvided) {
+            if (clientId) {
+                setFields.clientId = clientId;
+            } else {
+                updateQuery.$unset = { clientId: 1 };
+            }
+        }
+
         const updatedExpense = await expense.findByIdAndUpdate(
             expenseId,
-            {
-                title,
-                amount,
-                date: date ? new Date(date) : undefined,
-                category,
-                paymentMethod,
-                tags,
-                notes,
-                budgetSectionId,
-                clientId,
-                isActive,
-                updatedAt: new Date()
-            },
+            updateQuery,
             { new: true, runValidators: true }
         );
+
+        // Keep the linked client transaction (if any) in sync with the updated expense
+        const finalClientId = clientIdProvided ? (clientId || null) : expenseData.clientId;
+        const newLinkedTransactionId = await syncClientTransaction({
+            linkedTransactionId: expenseData.linkedTransactionId,
+            clientId: finalClientId,
+            parentId,
+            amount: updatedExpense.amount,
+            date: updatedExpense.date,
+            description: updatedExpense.title,
+            type: 'OUT'
+        });
+
+        if (String(newLinkedTransactionId || '') !== String(expenseData.linkedTransactionId || '')) {
+            if (!newLinkedTransactionId) {
+                updatedExpense.linkedTransactionId = undefined;
+                await expense.findByIdAndUpdate(expenseId, { $unset: { linkedTransactionId: 1 } });
+            } else {
+                updatedExpense.linkedTransactionId = newLinkedTransactionId;
+                await updatedExpense.save();
+            }
+        }
 
         return res.status(200).json(
             ApiResponse.updated(updatedExpense, "Expense updated successfully")
@@ -288,7 +336,10 @@ const deleteExpense = async (req, res, next) => {
             return next(ApiError.notFoundError('Expense not found'));
         }
 
-        await expense.findByIdAndUpdate(expenseId, { isActive: false });
+        // Remove the mirrored client transaction, if this expense was linked to one
+        await deleteLinkedTransaction(expenseData.linkedTransactionId);
+
+        await expense.findByIdAndUpdate(expenseId, { isActive: false, $unset: { linkedTransactionId: 1 } });
 
         return res.status(200).json(
             ApiResponse.deleted("Expense deleted successfully")

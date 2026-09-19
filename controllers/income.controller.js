@@ -3,6 +3,7 @@ const BudgetSection = require('../Models/budgetSection.modal');
 const Client = require('../Models/client.modal');
 const ApiError = require('../utils/apiError.utils');
 const ApiResponse = require('../utils/apiResponse.utils');
+const { syncClientTransaction, deleteLinkedTransaction } = require('../utils/clientTransactionSync');
 
 /**
  * Create a new income entry
@@ -64,6 +65,20 @@ const createIncome = async (req, res, next) => {
         }
 
         const newIncome = await Income.create(incomeData);
+
+        // If linked to a client, mirror this income as an IN transaction in the client's ledger
+        if (newIncome.clientId) {
+            newIncome.linkedTransactionId = await syncClientTransaction({
+                linkedTransactionId: null,
+                clientId: newIncome.clientId,
+                parentId,
+                amount: newIncome.amount,
+                date: newIncome.date,
+                description: newIncome.title,
+                type: 'IN'
+            });
+            await newIncome.save();
+        }
 
         return res.status(201).json(
             ApiResponse.created(newIncome, "Income created successfully")
@@ -259,6 +274,7 @@ const updateIncome = async (req, res, next) => {
         }
 
         // If clientId is being updated, validate it belongs to this user
+        const clientIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'clientId');
         if (req.body.clientId) {
             const client = await Client.findOne({ _id: req.body.clientId, parentId, isActive: true });
             if (!client) {
@@ -278,22 +294,54 @@ const updateIncome = async (req, res, next) => {
             isActive
         } = req.body;
 
+        const setFields = {
+            budgetSectionId,
+            title,
+            amount,
+            date: date ? new Date(date) : undefined,
+            description,
+            sourceType,
+            notes,
+            isActive,
+            updatedAt: new Date()
+        };
+
+        const updateQuery = { $set: setFields };
+        if (clientIdProvided) {
+            if (clientId) {
+                setFields.clientId = clientId;
+            } else {
+                updateQuery.$unset = { clientId: 1 };
+            }
+        }
+
         const updatedIncome = await Income.findByIdAndUpdate(
             incomeId,
-            {
-                budgetSectionId,
-                title,
-                amount,
-                date: date ? new Date(date) : undefined,
-                description,
-                sourceType,
-                notes,
-                clientId,
-                isActive,
-                updatedAt: new Date()
-            },
+            updateQuery,
             { new: true, runValidators: true }
         );
+
+        // Keep the linked client transaction (if any) in sync with the updated income
+        const finalClientId = clientIdProvided ? (clientId || null) : incomeData.clientId;
+        const newLinkedTransactionId = await syncClientTransaction({
+            linkedTransactionId: incomeData.linkedTransactionId,
+            clientId: finalClientId,
+            parentId,
+            amount: updatedIncome.amount,
+            date: updatedIncome.date,
+            description: updatedIncome.title,
+            type: 'IN'
+        });
+
+        if (String(newLinkedTransactionId || '') !== String(incomeData.linkedTransactionId || '')) {
+            if (!newLinkedTransactionId) {
+                updatedIncome.linkedTransactionId = undefined;
+                await Income.findByIdAndUpdate(incomeId, { $unset: { linkedTransactionId: 1 } });
+            } else {
+                updatedIncome.linkedTransactionId = newLinkedTransactionId;
+                await updatedIncome.save();
+            }
+        }
 
         return res.status(200).json(
             ApiResponse.updated(updatedIncome, "Income updated successfully")
@@ -325,7 +373,10 @@ const deleteIncome = async (req, res, next) => {
             return next(ApiError.notFoundError('Income not found'));
         }
 
-        await Income.findByIdAndUpdate(incomeId, { isActive: false });
+        // Remove the mirrored client transaction, if this income was linked to one
+        await deleteLinkedTransaction(incomeData.linkedTransactionId);
+
+        await Income.findByIdAndUpdate(incomeId, { isActive: false, $unset: { linkedTransactionId: 1 } });
 
         return res.status(200).json(
             ApiResponse.deleted("Income deleted successfully")

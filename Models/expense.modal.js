@@ -55,6 +55,11 @@ const expenseSchema = new mongoose.Schema({
         ref: 'clients',
         index: true
     },
+    // Transaction created in the linked client's ledger for this expense, kept in sync via clientTransactionSync
+    linkedTransactionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Transaction'
+    },
     isActive: {
         type: Boolean,
         default: true,

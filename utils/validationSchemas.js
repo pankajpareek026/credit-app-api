@@ -1039,6 +1039,7 @@ const expenseSchemas = {
                 'string.base': 'Budget section ID must be a string'
             }),
         clientId: Joi.string()
+            .allow(null, '')
             .optional()
             .messages({
                 'string.base': 'Client ID must be a string'
@@ -2149,6 +2150,7 @@ const incomeSchemas = {
                 'string.max': 'Notes must not exceed 1000 characters'
             }),
         clientId: Joi.string()
+            .allow(null, '')
             .optional()
             .messages({
                 'string.base': 'Client ID must be a string'

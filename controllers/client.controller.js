@@ -352,19 +352,24 @@ const allClients = async (req, res, next) => {
         const pagination = {
             currentPage: pageNum,
             totalPages,
+            // totalCount is kept for existing clients (DashboardProvider) that read this
+            // key directly; totalItems mirrors it since ApiResponse.setPagination emits that name.
             totalCount,
+            totalItems: totalCount,
+            itemsPerPage: limitNum,
             hasNextPage: pageNum < totalPages,
             hasPrevPage: pageNum > 1
         };
 
-        if (clientsData.length > 0) {
-            return res.status(200).json(
-                ApiResponse.paginated(clientsData, "Clients retrieved successfully", pagination)
-            );
-        }
-
+        // NOTE: ApiResponse.paginated expects (data, pagination, message) — passing
+        // these out of order silently produced a pagination block that always read
+        // hasNextPage: false, breaking every "load more" / infinite-scroll consumer.
         return res.status(200).json(
-            ApiResponse.success([], "No clients found")
+            ApiResponse.paginated(
+                clientsData,
+                pagination,
+                clientsData.length > 0 ? "Clients retrieved successfully" : "No clients found"
+            )
         );
 
     } catch (error) {

@@ -896,7 +896,11 @@ const bulkUpdateTransactionVisibility = async (req, res, next) => {
 const uploadTransactionAttachment = async (req, res, next) => {
     try {
         const { transactionId } = req.params;
-        const parentId = req.body.user._id;
+        // multer (uploadSingle) runs after authy and replaces req.body
+        // wholesale while parsing the multipart form, wiping out
+        // req.body.user - use req.user (set by authy, untouched by multer)
+        // instead.
+        const parentId = req.user._id;
 
         if (!transactionId) {
             return next(new ApiError(400, "Transaction ID is required"));
