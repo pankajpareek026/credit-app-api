@@ -28,6 +28,12 @@ async function authy(req, res, next) {
         }
 
         req.body.user = tokenResult
+        // Multer (used on multipart/form-data routes, e.g. file uploads)
+        // replaces req.body wholesale when it parses the request, wiping out
+        // req.body.user set above. req.user is untouched by multer, so
+        // routes that run a multer middleware after authy must read the
+        // user from here instead of req.body.user.
+        req.user = tokenResult
         next()
     } catch (error) {
         // Handle internal server error

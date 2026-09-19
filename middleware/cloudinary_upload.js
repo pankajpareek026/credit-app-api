@@ -68,20 +68,11 @@ const uploadSingle = upload.single('attachment');
 // Middleware for multiple file uploads
 const uploadMultiple = upload.array('attachments', 5);
 
-// Separate storage/upload config for APK distribution, kept independent
-// from the transaction-attachment config above (different folder, resource
-// type, file type, and size limit).
-const apkStorage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: process.env.CLOUDINARY_APK_FOLDER || 'credit-app/releases',
-        resource_type: 'raw',
-        allowed_formats: ['apk'],
-        use_filename: true,
-        unique_filename: true,
-    },
-});
-
+// APK uploads are held in memory (not streamed straight to Cloudinary like
+// the config above) so the controller can hash the exact received bytes
+// with SHA256 before/while uploading - that hash is what release.js and,
+// later, the app can use to verify the APK wasn't corrupted or tampered
+// with in transit.
 const apkFileFilter = (req, file, cb) => {
     if (file.originalname.toLowerCase().endsWith('.apk')) {
         cb(null, true);
@@ -91,7 +82,7 @@ const apkFileFilter = (req, file, cb) => {
 };
 
 const apkUpload = multer({
-    storage: apkStorage,
+    storage: multer.memoryStorage(),
     fileFilter: apkFileFilter,
     limits: {
         fileSize: 150 * 1024 * 1024, // 150MB limit
@@ -101,6 +92,28 @@ const apkUpload = multer({
 
 // Middleware for single APK upload
 const uploadApk = apkUpload.single('apk');
+
+// Uploads an in-memory APK buffer to Cloudinary as a raw resource.
+// Returns the same shape multer-storage-cloudinary would have set on
+// req.file (path/filename), used by the controller to build the response.
+const uploadApkBuffer = (buffer, originalname) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder: process.env.CLOUDINARY_APK_FOLDER || 'credit-app/releases',
+                resource_type: 'raw',
+                use_filename: true,
+                unique_filename: true,
+                filename_override: originalname,
+            },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+            }
+        );
+        stream.end(buffer);
+    });
+};
 
 // Error handling middleware
 const handleUploadError = (error, req, res, next) => {
@@ -165,6 +178,7 @@ module.exports = {
     uploadSingle,
     uploadMultiple,
     uploadApk,
+    uploadApkBuffer,
     handleUploadError,
     deleteFromCloudinary,
     getFileInfo,

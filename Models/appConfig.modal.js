@@ -30,6 +30,12 @@ const appConfigSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    apkSha256: {
+        type: String,
+        trim: true,
+        default: '',
+        match: [/^([a-f0-9]{64})?$/i, 'apkSha256 must be a 64-character hex SHA256 hash']
+    },
     releaseNotes: {
         type: String,
         trim: true,
