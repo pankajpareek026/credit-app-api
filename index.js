@@ -28,6 +28,7 @@ const routineRouter = require('./routes/routine.route.js')
 const taskRouter = require('./routes/task.route.js')
 const portfolioRouter = require('./routes/portfolio.route.js')
 const appConfigRouter = require('./routes/appConfig.route.js')
+const appFeatureConfigRouter = require('./routes/appFeatureConfig.route.js')
 
 // Import middleware
 const { errorHandler, notFoundHandler } = require('./middlewares/errorHandler.middleware.js')
@@ -64,6 +65,7 @@ app.use('/api/routines', routineRouter)
 app.use('/api/tasks', taskRouter)
 app.use('/api/portfolio', portfolioRouter)
 app.use('/api/app', appConfigRouter)
+app.use('/api/app', appFeatureConfigRouter)
 
 // 404 handler for unmatched routes
 app.use(notFoundHandler)
